@@ -52,8 +52,8 @@ if (!$s) {
 }
 
 // ── Công ty (lấy từ settings nếu có, fallback hardcode) ──────────────────
-$companyName    = 'CÔNG TY TNHH NTN';
-$companyAddress = '';
+$companyName    = 'CÔNG TY CỔ PHẦN SẢN XUẤT VÀ CUNG ỨNG NTN VIỆT NAM';
+$companyAddress = 'Số 36, Xóm Trại, Quan Âm, Xã Phúc Thịnh, Thành phố Hà Nội, Việt Nam';
 $companyTax     = '';
 try {
     $cfg = $pdo->query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ('company_name','company_address','company_tax')")->fetchAll(PDO::FETCH_KEY_PAIR);
