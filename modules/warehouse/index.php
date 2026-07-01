@@ -41,8 +41,8 @@ $monthlyStats = [
     'delivery_qty' => (float)fetchScalarSafe($pdo, "SELECT COALESCE(SUM(di.qty_deliver),0) FROM oqc_delivery_items di JOIN oqc_deliveries d ON d.id = di.delivery_id WHERE YEAR(d.delivery_date) = YEAR(CURDATE()) AND MONTH(d.delivery_date) = MONTH(CURDATE())", [], 0),
 ];
 
-$weekStart = fetchScalarSafe($pdo, "SELECT DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)", [], date('Y-m-d'));
-$weekEnd = fetchScalarSafe($pdo, "SELECT DATE_ADD(DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY), INTERVAL 6 DAY)", [], date('Y-m-d'));
+$weekStart = date('Y-m-d', strtotime('monday this week'));
+$weekEnd = date('Y-m-d', strtotime($weekStart . ' +6 days'));
 $monthLabel = date('m/Y');
 
 $dailyProgressTotal = (float)$dailyStats['done'] + (float)$dailyStats['error'] + (float)$dailyStats['pending'];
@@ -83,7 +83,7 @@ $monthlyCustomerDistribution = fetchAllSafe($pdo, "SELECT c.customer_name, COALE
                                                     JOIN customers c ON c.id = d.customer_id
                                                     LEFT JOIN oqc_delivery_items di ON di.delivery_id = d.id
                                                     WHERE YEAR(d.delivery_date)=YEAR(CURDATE()) AND MONTH(d.delivery_date)=MONTH(CURDATE())
-                                                    GROUP BY c.id
+                                                    GROUP BY c.id, c.customer_name
                                                     ORDER BY total_qty DESC
                                                     LIMIT 6");
 $customerLabels = [];
