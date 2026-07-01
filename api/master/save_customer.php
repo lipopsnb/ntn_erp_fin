@@ -40,6 +40,15 @@ if ($action !== 'delete' && !$customerName) {
     echo json_encode(['ok' => false, 'msg' => 'Thiếu tên khách hàng']); exit;
 }
 
+if ($action !== 'delete' && $email) {
+    foreach (explode(';', $email) as $emailItem) {
+        $emailItem = trim($emailItem);
+        if ($emailItem !== '' && !filter_var($emailItem, FILTER_VALIDATE_EMAIL)) {
+            echo json_encode(['ok' => false, 'msg' => 'Email không hợp lệ: ' . $emailItem]); exit;
+        }
+    }
+}
+
 try {
     if ($action === 'delete') {
         if (!hasRole('director')) {
