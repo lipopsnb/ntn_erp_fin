@@ -32,7 +32,15 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
             <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
             <input type="hidden" name="order_id" value="<?= (int)$id ?>">
             <div class="table-responsive"><table class="table table-hover align-middle">
-                <thead class="table-dark"><tr><th><div class="form-check mb-0"><input class="form-check-input" type="checkbox" id="checkAll"><label class="form-check-label small" for="checkAll">Hoàn thành 100%</label></div></th><th>Mã hàng</th><th>Tên hàng</th><th>ĐVT</th><th class="text-end">SL Tổng</th><th class="text-end text-success">SL Hoàn thành</th><th class="text-end text-danger">SL Lỗi</th><th class="text-end text-warning">SL Chưa HT</th><th>Công đoạn</th><th>Ghi chú</th><th>Trạng thái</th></tr></thead>
+                <thead class="table-dark"><tr>
+                    <th><div class="form-check mb-0"><input class="form-check-input" type="checkbox" id="checkAll"><label class="form-check-label small" for="checkAll">Hoàn<br>thành<br>100%</label></div></th>
+                    <th>Mã hàng</th><th>Tên hàng</th><th>ĐVT</th>
+                    <th class="text-end">SL Tổng</th>
+                    <th class="text-end text-success">SL Hoàn thành</th>
+                    <th class="text-end text-danger">SL Lỗi</th>
+                    <th class="text-end text-warning">SL Chưa HT</th>
+                    <th>Công đoạn</th><th>Ghi chú</th><th>Trạng thái</th>
+                </tr></thead>
                 <tbody>
                 <?php foreach($items as $idx => $it): ?>
                     <?php
@@ -75,6 +83,7 @@ const rows = document.querySelectorAll('#formProgress tbody tr');
 const checkAll = document.getElementById('checkAll');
 const FLOAT_TOLERANCE = 0.001;
 
+// Cập nhật trạng thái checkAll (indeterminate / checked / unchecked)
 function updateCheckAllState(){
   const rowChecks = document.querySelectorAll('.check-done');
   const checked = document.querySelectorAll('.check-done:checked');
@@ -82,17 +91,19 @@ function updateCheckAllState(){
   checkAll.indeterminate = checked.length > 0 && checked.length < rowChecks.length;
 }
 
+// Cập nhật SL chưa HT, badge trạng thái và màu dòng — KHÔNG chạm vào checkbox
 function updateRowPending(tr){
   const total = Number(tr.querySelector('.qty-total').textContent || 0);
-  const done = Number(tr.querySelector('.qty-done').value || 0);
-  const err = Number(tr.querySelector('.qty-error').value || 0);
+  const done  = Number(tr.querySelector('.qty-done').value  || 0);
+  const err   = Number(tr.querySelector('.qty-error').value || 0);
   const pending = Math.max(total - done - err, 0);
+
   tr.querySelector('.qty-pending').textContent = pending.toFixed(2);
 
   const statusBadge = tr.querySelector('.status-badge');
   let statusClass = 'warning';
   let statusLabel = 'Đang gia công';
-  if (pending <= 0) {
+  if (pending <= FLOAT_TOLERANCE) {
     if (err > 0) {
       statusClass = 'danger';
       statusLabel = 'Có lỗi';
@@ -103,34 +114,55 @@ function updateRowPending(tr){
   }
   statusBadge.className = `badge bg-${statusClass} status-badge`;
   statusBadge.textContent = statusLabel;
-
   tr.classList.toggle('table-danger', err > 0);
-  tr.querySelector('.check-done').checked = total > 0 && Math.abs(done - total) < FLOAT_TOLERANCE && Math.abs(err) < FLOAT_TOLERANCE;
+}
+
+// Sync checkbox của 1 dòng dựa vào giá trị nhập tay (chỉ gọi khi user tự gõ số)
+function syncRowCheckFromInput(tr){
+  const total = Number(tr.querySelector('.qty-total').textContent || 0);
+  const done  = Number(tr.querySelector('.qty-done').value  || 0);
+  const err   = Number(tr.querySelector('.qty-error').value || 0);
+  const cb    = tr.querySelector('.check-done');
+  cb.checked  = total > 0 && Math.abs(done - total) < FLOAT_TOLERANCE && Math.abs(err) < FLOAT_TOLERANCE;
   updateCheckAllState();
 }
 
-rows.forEach(tr=>{
+rows.forEach(tr => {
   const doneInput = tr.querySelector('.qty-done');
-  const errInput = tr.querySelector('.qty-error');
-  const rowCheck = tr.querySelector('.check-done');
+  const errInput  = tr.querySelector('.qty-error');
+  const rowCheck  = tr.querySelector('.check-done');
 
-  doneInput.addEventListener('input', ()=>updateRowPending(tr));
-  errInput.addEventListener('input', ()=>updateRowPending(tr));
-  rowCheck.addEventListener('change', ()=>{
+  // Khi user gõ số → cập nhật pending + sync checkbox
+  doneInput.addEventListener('input', () => { updateRowPending(tr); syncRowCheckFromInput(tr); });
+  errInput.addEventListener('input',  () => { updateRowPending(tr); syncRowCheckFromInput(tr); });
+
+  // Khi user tick checkbox → điền / reset số lượng
+  rowCheck.addEventListener('change', () => {
     const total = Number(tr.querySelector('.qty-total').textContent || 0);
     doneInput.value = rowCheck.checked ? total.toFixed(2) : '0.00';
-    errInput.value = '0.00';
+    errInput.value  = '0.00';
     updateRowPending(tr);
+    updateCheckAllState();
   });
 
+  // Khởi tạo ban đầu
   updateRowPending(tr);
+  syncRowCheckFromInput(tr);
 });
 
-checkAll.addEventListener('change', ()=>{
-  document.querySelectorAll('.check-done').forEach(cb=>{
-    cb.checked = checkAll.checked;
-    cb.dispatchEvent(new Event('change'));
+// Checkbox "tích tất cả"
+checkAll.addEventListener('change', () => {
+  rows.forEach(tr => {
+    const cb    = tr.querySelector('.check-done');
+    const total = Number(tr.querySelector('.qty-total').textContent || 0);
+    const done  = tr.querySelector('.qty-done');
+    const err   = tr.querySelector('.qty-error');
+    cb.checked  = checkAll.checked;
+    done.value  = checkAll.checked ? total.toFixed(2) : '0.00';
+    err.value   = '0.00';
+    updateRowPending(tr);
   });
+  updateCheckAllState();
 });
 
 document.getElementById('formProgress').addEventListener('submit', async function(e){
@@ -138,12 +170,12 @@ document.getElementById('formProgress').addEventListener('submit', async functio
   let valid = true;
   rows.forEach(tr=>{
     const total = Number(tr.querySelector('.qty-total').textContent || 0);
-    const done = Number(tr.querySelector('.qty-done').value || 0);
-    const err = Number(tr.querySelector('.qty-error').value || 0);
-    if (done + err > total) valid = false;
+    const done  = Number(tr.querySelector('.qty-done').value  || 0);
+    const err   = Number(tr.querySelector('.qty-error').value || 0);
+    if (done + err > total + FLOAT_TOLERANCE) valid = false;
   });
   if(!valid){ alert('SL hoàn thành + lỗi không được vượt quá SL tổng'); return; }
-  const res = await fetch('/erp/api/production/save_progress.php', {method:'POST', body:new FormData(this)});
+  const res  = await fetch('/erp/api/production/save_progress.php', {method:'POST', body:new FormData(this)});
   const data = await res.json();
   if(data.ok){ alert('Đã lưu tiến độ'); location.reload(); }
   else alert(data.msg || 'Không thể lưu');
