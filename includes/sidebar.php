@@ -21,9 +21,10 @@ elseif (isGroupActive(['/attendance/', '/leave_request', '/ot_request', '/all_at
                         '/payroll/holidays'])) $activeGroup = 'attendance';
 elseif (isGroupActive(['/payroll/'])) $activeGroup = 'payroll';
 elseif (isGroupActive(['/master/'])) $activeGroup = 'master';
-elseif (isGroupActive(['/warehouse/', '/production/'])) $activeGroup = 'warehouse';
+elseif (isGroupActive(['/warehouse/'])) $activeGroup = 'wh_sx';
+elseif (isGroupActive(['/production/'])) $activeGroup = 'production';
+elseif (isGroupActive(['/warehouse_admin/'])) $activeGroup = 'wh_admin';
 elseif (isGroupActive(['/invoice/'])) $activeGroup = 'invoice';
-elseif (isGroupActive(['/admin/inv_'])) $activeGroup = 'inventory';
 elseif (isGroupActive(['/admin/expenses', '/admin/assets', '/admin/vehicles', '/admin/budget'])) $activeGroup = 'admin';
 elseif (isGroupActive(['/modules/kpi/'])) $activeGroup = 'kpi';
 elseif (isGroupActive(['/modules/users/index'])) $activeGroup = 'system';
@@ -128,28 +129,36 @@ elseif (isGroupActive(['/modules/users/index'])) $activeGroup = 'system';
     </li>
     <?php endif; ?>
 
-    <!-- KHO & SẢN XUẤT -->
+    <!-- KHO SẢN XUẤT -->
     <?php if (hasRole('director','accountant','warehouse','production','manager')): ?>
     <li class="nav-item">
-      <a class="nav-link sidebar-group-toggle" href="#" data-target="grp-warehouse">
-        <i class="fas fa-boxes"></i><span>Kho &amp; Sản xuất</span>
+      <a class="nav-link sidebar-group-toggle" href="#" data-target="grp-wh_sx">
+        <i class="fas fa-boxes"></i><span>Kho Sản Xuất</span>
         <i class="fas fa-chevron-down sidebar-arrow"></i>
       </a>
-      <ul class="sidebar-submenu" id="grp-warehouse">
+      <ul class="sidebar-submenu" id="grp-wh_sx">
         <li><a class="nav-link <?= isActive('/warehouse/index') ?>" href="/erp/modules/warehouse/index.php">
-          <i class="fas fa-boxes"></i><span>Quản lý kho</span></a></li>
+          <i class="fas fa-tachometer-alt"></i><span>Tổng quan kho SX</span></a></li>
+        <li><a class="nav-link <?= isActive('/warehouse/iqc_list') ?>" href="/erp/modules/warehouse/iqc_list.php">
+          <i class="fas fa-file-import"></i><span>Nhập Kho IQC</span></a></li>
+        <li><a class="nav-link <?= isActive('/warehouse/oqc_list') ?>" href="/erp/modules/warehouse/oqc_list.php">
+          <i class="fas fa-boxes"></i><span>Kho thành phẩm OQC</span></a></li>
+        <li><a class="nav-link <?= isActive('/warehouse/oqc_delivery') ?>" href="/erp/modules/warehouse/oqc_delivery.php">
+          <i class="fas fa-truck"></i><span>Xuất kho / Giao hàng</span></a></li>
+      </ul>
+    </li>
+    <?php endif; ?>
+
+    <!-- SẢN XUẤT -->
+    <?php if (hasRole('director','accountant','warehouse','production','manager')): ?>
+    <li class="nav-item">
+      <a class="nav-link sidebar-group-toggle" href="#" data-target="grp-production">
+        <i class="fas fa-industry"></i><span>Sản xuất</span>
+        <i class="fas fa-chevron-down sidebar-arrow"></i>
+      </a>
+      <ul class="sidebar-submenu" id="grp-production">
         <li><a class="nav-link <?= isActive('/production/index') ?>" href="/erp/modules/production/index.php">
-          <i class="fas fa-industry"></i><span>Sản xuất</span></a></li>
-        <li><a class="nav-link <?= isActive('/production/warehouse_in') ?>" href="/erp/modules/production/warehouse_in.php">
-          <i class="fas fa-file-import"></i><span>Nhập kho NVL</span></a></li>
-        <li><a class="nav-link <?= isActive('/production/output') ?>" href="/erp/modules/production/output.php">
-          <i class="fas fa-cogs"></i><span>Tiến độ gia công</span></a></li>
-        <li><a class="nav-link <?= isActive('/warehouse/finished_goods') ?>" href="/erp/modules/warehouse/finished_goods.php">
-          <i class="fas fa-boxes"></i><span>Kho thành phẩm</span></a></li>
-        <li><a class="nav-link <?= isActive('/warehouse/export') ?>" href="/erp/modules/warehouse/export.php">
-          <i class="fas fa-file-export"></i><span>Xuất kho</span></a></li>
-        <li><a class="nav-link <?= isActive('/production/delivery') ?>" href="/erp/modules/production/delivery.php">
-          <i class="fas fa-truck"></i><span>Giao hàng</span></a></li>
+          <i class="fas fa-tasks"></i><span>Tiến độ gia công</span></a></li>
       </ul>
     </li>
     <?php endif; ?>
@@ -197,21 +206,19 @@ elseif (isGroupActive(['/modules/users/index'])) $activeGroup = 'system';
     <!-- KHO VẬT TƯ -->
     <?php if (hasRole('director','accountant','manager','warehouse')): ?>
     <li class="nav-item">
-      <a class="nav-link sidebar-group-toggle" href="#" data-target="grp-inventory">
+      <a class="nav-link sidebar-group-toggle" href="#" data-target="grp-wh_admin">
         <i class="fas fa-warehouse"></i><span>Kho vật tư</span>
         <i class="fas fa-chevron-down sidebar-arrow"></i>
       </a>
-      <ul class="sidebar-submenu" id="grp-inventory">
-        <li><a class="nav-link <?= isActive('/admin/inv_items') ?>" href="/erp/modules/admin/inv_items.php">
-          <i class="fas fa-list-alt"></i><span>Danh mục hàng hoá</span></a></li>
-        <li><a class="nav-link <?= isActive('/admin/inv_import') ?>" href="/erp/modules/admin/inv_import.php">
-          <i class="fas fa-arrow-circle-down"></i><span>Nhập kho</span></a></li>
-        <li><a class="nav-link <?= isActive('/admin/inv_export') ?>" href="/erp/modules/admin/inv_export.php">
-          <i class="fas fa-arrow-circle-up"></i><span>Xuất kho</span></a></li>
-        <li><a class="nav-link <?= isActive('/admin/inv_stock') ?>" href="/erp/modules/admin/inv_stock.php">
-          <i class="fas fa-warehouse"></i><span>Tồn kho</span></a></li>
-        <li><a class="nav-link <?= isActive('/admin/inv_report') ?>" href="/erp/modules/admin/inv_report.php">
-          <i class="fas fa-chart-bar"></i><span>Báo cáo kho</span></a></li>
+      <ul class="sidebar-submenu" id="grp-wh_admin">
+        <li><a class="nav-link <?= isActive('/warehouse_admin/index') ?>" href="/erp/modules/warehouse_admin/index.php">
+          <i class="fas fa-tachometer-alt"></i><span>Tổng quan</span></a></li>
+        <li><a class="nav-link <?= isActive('/warehouse_admin/categories') ?>" href="/erp/modules/warehouse_admin/categories.php">
+          <i class="fas fa-tags"></i><span>Nhóm vật tư</span></a></li>
+        <li><a class="nav-link <?= isActive('/warehouse_admin/items') ?>" href="/erp/modules/warehouse_admin/items.php">
+          <i class="fas fa-list-alt"></i><span>Danh mục vật tư</span></a></li>
+        <li><a class="nav-link <?= isActive('/warehouse_admin/transactions') ?>" href="/erp/modules/warehouse_admin/transactions.php">
+          <i class="fas fa-exchange-alt"></i><span>Nhập / Xuất kho</span></a></li>
       </ul>
     </li>
     <?php endif; ?>
