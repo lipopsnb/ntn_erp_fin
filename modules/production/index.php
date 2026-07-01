@@ -9,12 +9,14 @@ $pdo = getDBConnection();
 $month = preg_match('/^\d{4}-\d{2}$/', (string)($_GET['month'] ?? '')) ? (string)$_GET['month'] : '';
 $customerId = (int)($_GET['customer_id'] ?? 0);
 $status = trim((string)($_GET['status'] ?? ''));
+$isDefaultView = $month === '' && $customerId === 0 && $status === '';
 
 $where = ['1=1'];
 $params = [];
 if ($month !== '') { $where[] = "DATE_FORMAT(o.created_at, '%Y-%m') = ?"; $params[] = $month; }
 if ($customerId > 0) { $where[] = 'r.customer_id = ?'; $params[] = $customerId; }
 if (in_array($status, ['pending','in_progress','done'], true)) { $where[] = 'o.status = ?'; $params[] = $status; }
+if ($isDefaultView) { $where[] = "(o.status != 'done' OR DATE(o.updated_at) = CURDATE())"; }
 
 $customers = fetchAllSafe($pdo, 'SELECT id, customer_name FROM customers WHERE is_active = 1 ORDER BY customer_name');
 $orders = fetchAllSafe($pdo, "SELECT o.id, o.order_no, o.status, o.created_at, r.receipt_no, c.customer_name,
@@ -41,6 +43,14 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
         <div class="col-auto"><button class="btn btn-sm btn-primary"><i class="fas fa-filter me-1"></i>Lọc</button></div>
         <div class="col-auto"><a href="/erp/modules/production/index.php" class="btn btn-sm btn-outline-secondary">Reset</a></div>
     </form></div></div>
+
+    <?php if ($isDefaultView): ?>
+    <div class="alert alert-info py-2 small mb-3 border-0 bg-info bg-opacity-10">
+        <i class="fas fa-eye-slash me-1"></i>
+        Đang hiển thị lệnh <strong>chưa hoàn thành</strong> và lệnh hoàn thành <strong>hôm nay</strong>.
+        Dùng bộ lọc bên trên để xem lịch sử.
+    </div>
+    <?php endif; ?>
 
     <div class="card border-0 shadow-sm"><div class="table-responsive"><table class="table table-hover align-middle mb-0">
         <thead class="table-dark"><tr><th>Số lệnh</th><th>Ngày tạo</th><th>Khách hàng</th><th>Số phiếu IQC</th><th class="text-end">Tổng SP</th><th class="text-end">Đã HT</th><th class="text-end">Lỗi</th><th class="text-end">Còn lại</th><th>Trạng thái</th></tr></thead>

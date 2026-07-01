@@ -9,12 +9,14 @@ $pdo = getDBConnection();
 $month = preg_match('/^\d{4}-\d{2}$/', (string)($_GET['month'] ?? '')) ? (string)$_GET['month'] : '';
 $customerId = (int)($_GET['customer_id'] ?? 0);
 $status = trim((string)($_GET['status'] ?? ''));
+$isDefaultView = $month === '' && $customerId === 0 && $status === '';
 
 $where = ['1=1'];
 $params = [];
 if ($month !== '') { $where[] = "DATE_FORMAT(r.received_date, '%Y-%m') = ?"; $params[] = $month; }
 if ($customerId > 0) { $where[] = 'r.customer_id = ?'; $params[] = $customerId; }
 if (in_array($status, ['open','in_production','done'], true)) { $where[] = 'r.status = ?'; $params[] = $status; }
+if ($isDefaultView) { $where[] = "(r.status != 'done' OR r.received_date = CURDATE())"; }
 
 $customers = fetchAllSafe($pdo, 'SELECT id, customer_name FROM customers WHERE is_active = 1 ORDER BY customer_name');
 $receivers = fetchAllSafe($pdo, 'SELECT id, full_name FROM users WHERE is_active = 1 ORDER BY full_name');
@@ -84,6 +86,14 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
             </div>
         </form>
     </div></div>
+
+    <?php if ($isDefaultView): ?>
+    <div class="alert alert-info py-2 small mb-3 border-0 bg-info bg-opacity-10">
+        <i class="fas fa-eye-slash me-1"></i>
+        Đang hiển thị phiếu <strong>chưa hoàn thành</strong> và hoàn thành <strong>hôm nay</strong>.
+        Dùng bộ lọc bên trên để xem lịch sử.
+    </div>
+    <?php endif; ?>
 
     <!-- Danh sách -->
     <div class="card border-0 shadow-sm">

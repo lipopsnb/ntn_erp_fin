@@ -8,10 +8,12 @@ $pdo = getDBConnection();
 
 $customerId = (int)($_GET['customer_id'] ?? 0);
 $status = trim((string)($_GET['status'] ?? ''));
+$isDefaultView = $customerId === 0 && $status === '';
 $where = ['(pi.qty_done > 0 OR pi.qty_error > 0)'];
 $params = [];
 if ($customerId > 0) { $where[] = 'r.customer_id = ?'; $params[] = $customerId; }
 if (in_array($status, ['in_progress','done','error'], true)) { $where[] = 'pi.status = ?'; $params[] = $status; }
+if ($isDefaultView) { $where[] = "(pi.status != 'done' OR DATE(pi.updated_at) = CURDATE())"; }
 
 $customers = fetchAllSafe($pdo, 'SELECT id, customer_name FROM customers WHERE is_active = 1 ORDER BY customer_name');
 $rows = fetchAllSafe($pdo, "SELECT pi.id, pi.qty_total, pi.qty_done, pi.qty_error, pi.status,
@@ -43,6 +45,14 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
         <div class="col-auto"><button class="btn btn-sm btn-primary"><i class="fas fa-filter me-1"></i>Lọc</button></div>
         <div class="col-auto"><a href="/erp/modules/warehouse/oqc_list.php" class="btn btn-sm btn-outline-secondary">Reset</a></div>
     </form></div></div>
+
+    <?php if ($isDefaultView): ?>
+    <div class="alert alert-info py-2 small mb-3 border-0 bg-info bg-opacity-10">
+        <i class="fas fa-eye-slash me-1"></i>
+        Đang hiển thị sản phẩm <strong>chưa hoàn thành</strong> và hoàn thành <strong>hôm nay</strong>.
+        Dùng bộ lọc bên trên để xem lịch sử.
+    </div>
+    <?php endif; ?>
 
     <div class="card border-0 shadow-sm"><div class="table-responsive"><table class="table table-hover align-middle mb-0">
         <thead class="table-dark"><tr><th>Lệnh SX</th><th>Khách hàng</th><th>Mã hàng</th><th>Tên hàng</th><th class="text-end text-success">SL HT</th><th class="text-end text-danger">SL Lỗi</th><th class="text-end text-warning">SL Chờ</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
