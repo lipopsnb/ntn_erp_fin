@@ -41,6 +41,14 @@ $isValidDate = static function ($d): bool {
     return $dt instanceof DateTime && $dt->format('Y-m-d') === $d;
 };
 
+$parsePrice = static function (string $raw): ?float {
+    $normalized = str_replace(',', '', preg_replace('/\s+/', '', $raw));
+    if ($normalized === '' || !preg_match('/^-?\d+(\.\d+)?$/', $normalized)) {
+        return null;
+    }
+    return (float)$normalized;
+};
+
 try {
     $pdo->beginTransaction();
 
@@ -67,7 +75,7 @@ try {
         $description = trim((string)($r[1] ?? ''));
         $unit = trim((string)($r[2] ?? '')) ?: 'cái';
         $unitPriceRaw = trim((string)($r[3] ?? ''));
-        $unitPrice = (float)(preg_replace('/[^0-9.\-]/', '', $unitPriceRaw) ?: '0');
+        $unitPrice = $parsePrice($unitPriceRaw);
         $effectiveDate = trim((string)($r[4] ?? ''));
         $expiredDate = trim((string)($r[5] ?? '')) ?: null;
         $note = trim((string)($r[6] ?? '')) ?: null;
@@ -77,6 +85,7 @@ try {
             !$description ||
             !$unit ||
             $unitPriceRaw === '' ||
+            $unitPrice === null ||
             $unitPrice < 0 ||
             !$isValidDate($effectiveDate) ||
             ($expiredDate !== null && !$isValidDate($expiredDate))

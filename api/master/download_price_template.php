@@ -26,7 +26,7 @@ if ($hasSpreadsheet) {
     }
 
     $sheet->fromArray([
-        ['SP-001', 'Tên sản phẩm 1', 'chiếc', 3690, date('Y-m-d'), '', ''],
+        ['SP-001', 'Tên sản phẩm 1', 'cái', 3690, date('Y-m-d'), '', ''],
         ['SP-002', 'Tên sản phẩm 2', 'cái', 5000, date('Y-m-d'), '', ''],
     ], null, 'A2');
 
@@ -64,5 +64,5 @@ header('Content-Type: text/csv; charset=utf-8');
 header('Content-Disposition: attachment; filename="mau_import_san_pham.csv"');
 echo "\xEF\xBB\xBF";
 echo "Mã SP,Tên SP,Đơn vị,Đơn giá,Ngày áp dụng (YYYY-MM-DD),Đến ngày (YYYY-MM-DD),Ghi chú\n";
-echo "SP-001,Tên sản phẩm 1,chiếc,3690," . date('Y-m-d') . ",,\n";
+echo "SP-001,Tên sản phẩm 1,cái,3690," . date('Y-m-d') . ",,\n";
 echo "SP-002,Tên sản phẩm 2,cái,5000," . date('Y-m-d') . ",,\n";

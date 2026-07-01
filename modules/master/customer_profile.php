@@ -536,15 +536,25 @@ const isValidYmd = (value) => {
     return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 };
 
+const parseImportPrice = (raw) => {
+    const value = String(raw ?? '').trim();
+    if (value === '') return { valid: false, amount: 0 };
+    const normalized = value.replace(/\s+/g, '').replace(/,/g, '');
+    if (!/^-?\d+(\.\d+)?$/.test(normalized)) {
+        return { valid: false, amount: 0 };
+    }
+    return { valid: true, amount: Number(normalized) };
+};
+
 document.getElementById('importFile')?.addEventListener('change', function(e) {
     const file = e.target.files?.[0];
     if (!file || typeof XLSX === 'undefined') return;
 
     const reader = new FileReader();
     reader.onload = function(ev) {
-        const wb = XLSX.read(ev.target.result, { type: 'binary', cellDates: true });
+        const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array', cellDates: true });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, dateNF: 'yyyy-mm-dd' });
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, dateNF: 'yyyy-MM-dd' });
 
         const dataRows = rows.slice(1).filter(r => r.length > 0 && r[0]);
         importData = dataRows;
@@ -557,17 +567,19 @@ document.getElementById('importFile')?.addEventListener('change', function(e) {
             const description = String(r[1] || '').trim();
             const unit = String(r[2] || '').trim() || 'cái';
             const unitPriceRaw = String(r[3] || '').trim();
-            const unitPrice = parseFloat(unitPriceRaw.replace(/[^0-9.-]/g, '')) || 0;
+            const parsedPrice = parseImportPrice(unitPriceRaw);
+            const unitPrice = parsedPrice.amount;
             const effectiveDate = String(r[4] || '').trim();
             const expiredDate = String(r[5] || '').trim();
             const note = String(r[6] || '').trim();
 
-            const hasRequired = !!(productCode && description && unit && unitPriceRaw && effectiveDate);
+            const hasRequired = !!(productCode && description && unit && effectiveDate);
             const dateValid = isValidYmd(effectiveDate);
             const expiredValid = !expiredDate || isValidYmd(expiredDate);
+            const priceValid = parsedPrice.valid && unitPrice >= 0;
             let status = '✅ Hợp lệ';
             let rowClass = '';
-            if (!hasRequired || !dateValid || !expiredValid) {
+            if (!hasRequired || !dateValid || !expiredValid || !priceValid) {
                 status = '❌ Thiếu dữ liệu / sai định dạng';
                 rowClass = 'table-danger';
             }
@@ -590,7 +602,7 @@ document.getElementById('importFile')?.addEventListener('change', function(e) {
         document.getElementById('btnConfirmImport').classList.remove('d-none');
         document.getElementById('importResult').classList.add('d-none');
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
 });
 
 document.getElementById('btnConfirmImport')?.addEventListener('click', async function() {
