@@ -160,7 +160,9 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                             $debt    = $inv['total_amount'] - $inv['paid_amount'];
                             $overdue = $inv['due_date'] && $inv['status'] !== 'paid' && $inv['status'] !== 'draft' && $inv['due_date'] < date('Y-m-d');
                         ?>
-                        <tr class="<?= $overdue ? 'table-danger' : '' ?>">
+                        <tr class="<?= $overdue ? 'table-danger' : '' ?>"
+                            style="cursor:pointer"
+                            onclick="window.location='invoice_detail.php?id=<?= (int)$inv['id'] ?>'">
                             <td class="fw-semibold text-primary">
                                 <?= htmlspecialchars($inv['invoice_no']) ?>
                                 <?php if ($overdue): ?>
@@ -191,20 +193,25 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                                 <?= $inv['due_date'] ? date('d/m/Y', strtotime($inv['due_date'])) : '—' ?>
                             </td>
                             <td>
-                                <a href="invoice_detail.php?id=<?= $inv['id'] ?>"
-                                   class="btn btn-sm btn-outline-primary">
-                                    <i class="fas fa-eye"></i>
-                                </a>
+                                <button class="btn btn-sm btn-outline-warning btn-vat-placeholder"
+                                        title="Xuất hoá đơn VAT (đang hoàn thiện)"
+                                        onclick="event.stopPropagation()">
+                                    <i class="fas fa-file-invoice-dollar"></i>
+                                </button>
                                 <?php if ($inv['status'] !== 'paid' && $inv['status'] !== 'cancelled' && $inv['status'] !== 'draft'): ?>
                                 <button class="btn btn-sm btn-outline-success btn-pay"
                                         data-id="<?= $inv['id'] ?>"
                                         data-no="<?= htmlspecialchars($inv['invoice_no']) ?>"
-                                        data-debt="<?= $debt ?>">
+                                        data-debt="<?= $debt ?>"
+                                        title="Ghi thu tiền"
+                                        onclick="event.stopPropagation()">
                                     <i class="fas fa-money-bill-wave"></i>
                                 </button>
                                 <?php endif; ?>
                                 <a href="/erp/api/invoice/print_invoice.php?id=<?= $inv['id'] ?>"
-                                   target="_blank" class="btn btn-sm btn-outline-secondary">
+                                   target="_blank" class="btn btn-sm btn-outline-secondary"
+                                   title="In hoá đơn"
+                                   onclick="event.stopPropagation()">
                                     <i class="fas fa-print"></i>
                                 </a>
                             </td>
@@ -661,6 +668,14 @@ document.querySelectorAll('.btn-pay').forEach(btn => {
         document.getElementById('payDebtInfo').textContent =
             'Còn nợ: ' + parseInt(btn.dataset.debt).toLocaleString('vi-VN') + ' đ';
         new bootstrap.Modal(document.getElementById('modalPay')).show();
+    });
+});
+
+// ── Xuất VAT (placeholder) ──
+document.querySelectorAll('.btn-vat-placeholder').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        alert('Tính năng xuất hoá đơn VAT đang được hoàn thiện. Vui lòng trở lại sau!');
     });
 });
 
