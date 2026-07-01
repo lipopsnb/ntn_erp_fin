@@ -69,30 +69,39 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
     </div>
 </div></div>
 <script>
-const selectItem = document.getElementById('txnItem');
-const currentStock = document.getElementById('currentStock');
+window.addEventListener('load', function() {
+    const selectItem = document.getElementById('txnItem');
+    const currentStock = document.getElementById('currentStock');
 
-selectItem?.addEventListener('change', function() {
-    currentStock.textContent = Number(this.selectedOptions[0]?.dataset.stock || 0).toLocaleString('vi-VN');
-});
+    if (selectItem) {
+        selectItem.addEventListener('change', function() {
+            if (currentStock) {
+                currentStock.textContent = Number(this.selectedOptions[0]?.dataset.stock || 0).toLocaleString('vi-VN');
+            }
+        });
+    }
 
-document.getElementById('formTxn').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    try {
-        const res = await fetch('/erp/api/warehouse_admin/save_transaction.php', {method: 'POST', body: new FormData(this)});
-        if (!res.ok) {
-            alert('Lỗi server (HTTP ' + res.status + '). Vui lòng tải lại trang và thử lại.');
-            return;
-        }
-        const data = await res.json();
-        if (data.ok) {
-            alert('Đã ghi nhận giao dịch');
-            location.reload();
-        } else {
-            alert(data.msg || 'Không thể lưu giao dịch');
-        }
-    } catch (err) {
-        alert('Không thể kết nối server. Vui lòng tải lại trang và thử lại.');
+    const formTxn = document.getElementById('formTxn');
+    if (formTxn) {
+        formTxn.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            try {
+                const res = await fetch('/erp/api/warehouse_admin/save_transaction.php', {method: 'POST', body: new FormData(this)});
+                if (!res.ok) {
+                    alert('Lỗi server (HTTP ' + res.status + '). Vui lòng tải lại trang và thử lại.');
+                    return;
+                }
+                const data = await res.json();
+                if (data.ok) {
+                    alert('Đã ghi nhận giao dịch');
+                    location.reload();
+                } else {
+                    alert(data.msg || 'Không thể lưu giao dịch');
+                }
+            } catch (err) {
+                alert('Không thể kết nối server. Vui lòng tải lại trang và thử lại.');
+            }
+        });
     }
 });
 </script>
