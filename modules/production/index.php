@@ -29,7 +29,6 @@ $orders = fetchAllSafe($pdo, "SELECT o.id, o.order_no, o.status, o.created_at, r
                            GROUP BY o.id
                            ORDER BY o.id DESC", $params);
 
-$badge = ['pending'=>'secondary','in_progress'=>'warning','done'=>'success'];
 include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/header.php';
 include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
 ?>
@@ -44,11 +43,11 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
     </form></div></div>
 
     <div class="card border-0 shadow-sm"><div class="table-responsive"><table class="table table-hover align-middle mb-0">
-        <thead class="table-dark"><tr><th>Số lệnh</th><th>Ngày tạo</th><th>Khách hàng</th><th>Số phiếu IQC</th><th class="text-end">Tổng SP</th><th class="text-end">Đã HT</th><th class="text-end">Lỗi</th><th class="text-end">Còn lại</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+        <thead class="table-dark"><tr><th>Số lệnh</th><th>Ngày tạo</th><th>Khách hàng</th><th>Số phiếu IQC</th><th class="text-end">Tổng SP</th><th class="text-end">Đã HT</th><th class="text-end">Lỗi</th><th class="text-end">Còn lại</th><th>Trạng thái</th></tr></thead>
         <tbody>
-        <?php if(!$orders): ?><tr><td colspan="10" class="text-center text-muted py-4">Không có lệnh sản xuất</td></tr><?php endif; ?>
-        <?php foreach($orders as $row): $pending=(float)$row['qty_total']-(float)$row['qty_done']-(float)$row['qty_error']; ?>
-            <tr>
+        <?php if(!$orders): ?><tr><td colspan="9" class="text-center text-muted py-4">Không có lệnh sản xuất</td></tr><?php endif; ?>
+        <?php foreach($orders as $row): $pending=(float)$row['qty_total']-(float)$row['qty_done']-(float)$row['qty_error']; $statusLabel = $pending > 0 ? 'Đang gia công' : 'Hoàn thành'; $statusClass = $pending > 0 ? 'warning' : 'success'; ?>
+            <tr style="cursor:pointer" tabindex="0" onclick="window.location='/erp/modules/production/detail.php?id=<?= (int)$row['id'] ?>'" onkeydown="if(event.key==='Enter'){window.location='/erp/modules/production/detail.php?id=<?= (int)$row['id'] ?>';}">
                 <td class="fw-semibold"><?= e($row['order_no']) ?></td>
                 <td><?= e(formatDateTime($row['created_at'])) ?></td>
                 <td><?= e($row['customer_name']) ?></td>
@@ -57,8 +56,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                 <td class="text-end text-success"><?= e(number_format((float)$row['qty_done'],2,',','.')) ?></td>
                 <td class="text-end text-danger"><?= e(number_format((float)$row['qty_error'],2,',','.')) ?></td>
                 <td class="text-end text-warning"><?= e(number_format(max($pending,0),2,',','.')) ?></td>
-                <td><span class="badge bg-<?= e($badge[$row['status']] ?? 'secondary') ?>"><?= e($row['status']) ?></span></td>
-                <td><a class="btn btn-sm btn-outline-primary" href="/erp/modules/production/detail.php?id=<?= (int)$row['id'] ?>"><i class="fas fa-edit"></i></a></td>
+                <td><span class="badge bg-<?= $statusClass ?>"><?= $statusLabel ?></span></td>
             </tr>
         <?php endforeach; ?>
         </tbody>

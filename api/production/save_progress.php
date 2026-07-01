@@ -28,7 +28,6 @@ try {
         $qtyError = (float)($item['qty_error'] ?? 0);
         $stage = trim((string)($item['stage'] ?? '')) ?: null;
         $note = trim((string)($item['note'] ?? '')) ?: null;
-        $status = trim((string)($item['status'] ?? 'in_progress'));
 
         $selectItem->execute([$id, $orderId]);
         $dbItem = $selectItem->fetch(PDO::FETCH_ASSOC);
@@ -41,9 +40,7 @@ try {
             throw new RuntimeException('Số lượng không hợp lệ');
         }
 
-        if (!in_array($status, ['in_progress', 'done', 'error'], true)) {
-            $status = ($qtyDone + $qtyError >= $qtyTotal) ? 'done' : 'in_progress';
-        }
+        $status = ($qtyDone + $qtyError >= $qtyTotal && $qtyTotal > 0) ? 'done' : 'in_progress';
 
         $updateItem->execute([$qtyDone, $qtyError, $stage, $note, $status, currentUserId(), $id]);
     }
