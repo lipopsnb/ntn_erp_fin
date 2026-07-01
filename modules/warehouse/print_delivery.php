@@ -43,7 +43,9 @@ body{font-family:DejaVu Sans,Arial,sans-serif;color:#222;font-size:14px}.wrap{ma
 </head><body>
 <div class="wrap">
     <div class="head">
-        <div><strong>CÔNG TY TNHH NTN FINE BLANKING</strong></div>
+        <div><strong>CÔNG TY CỔ PHẦN SẢN XUẤT VÀ CUNG ỨNG NTN VIỆT NAM</strong></div>
+        <div style="font-size:12px;color:#555;">NTN VIETNAM PRODUCE AND SUPPLY JOINT STOCK COMPANY</div>
+        <div style="font-size:12px;color:#555;">Số 36, Xóm Trại, Quan Âm, Xã Phúc Thịnh, Thành phố Hà Nội | ĐT: 0966459663</div>
         <h2>BIÊN BẢN GIAO HÀNG</h2>
         <div>Số phiếu: <strong><?= e($delivery['delivery_no']) ?></strong></div>
     </div>
