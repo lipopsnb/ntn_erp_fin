@@ -69,5 +69,6 @@ try {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();
     }
-    echo json_encode(['ok' => false, 'msg' => 'Không thể lưu phiếu IQC']);
+    error_log('[save_iqc] ' . $e->getMessage() . ' | ' . $e->getTraceAsString());
+    echo json_encode(['ok' => false, 'msg' => 'Lỗi DB: ' . $e->getMessage()]);
 }
