@@ -355,17 +355,18 @@ function updateTotals() {
 
 document.getElementById('vatRate').addEventListener('input', updateTotals);
 
-document.getElementById('customerId').addEventListener('change', function() {
-    const opt = this.options[this.selectedIndex];
+function applyCustomerVat() {
+    const customerSelect = document.getElementById('customerId');
+    const opt = customerSelect.options[customerSelect.selectedIndex];
     const vat = opt?.dataset.vat ?? '8';
-    const vatSelect = document.querySelector('[name="vat_rate"]');
+    const vatSelect = document.getElementById('vatRate');
     if (vatSelect) {
         vatSelect.value = vat;
         updateTotals();
     }
-});
-
-document.getElementById('customerId').dispatchEvent(new Event('change'));
+}
+document.getElementById('customerId').addEventListener('change', applyCustomerVat);
+applyCustomerVat();
 
 // Lưu hoá đơn
 document.getElementById('btnSaveInvoice').addEventListener('click', () => {
