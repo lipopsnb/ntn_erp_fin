@@ -84,20 +84,24 @@ try {
     // Insert items
     $stmtItem = $pdo->prepare("
         INSERT INTO invoice_items
-            (invoice_id, product_code_id, description, unit, quantity, unit_price, total_price)
-        VALUES (?,?,?,?,?,?,?)
+            (invoice_id, delivery_note_id, delivery_note_item_id,
+             product_code_id, description, unit, quantity, unit_price, total_price)
+        VALUES (?,?,?,?,?,?,?,?,?)
     ");
     foreach ($validItems as $it) {
         $stmtItem->execute([
-            $invoiceId, $it['product_code_id'], $it['description'],
+            $invoiceId,
+            null,  // delivery_note_id — không dùng trong luồng OQC
+            null,  // delivery_note_item_id — không dùng trong luồng OQC
+            $it['product_code_id'], $it['description'],
             $it['unit'], $it['quantity'], $it['unit_price'], $it['total_price']
         ]);
     }
 
-    // Cập nhật status biên bản → invoiced
+    // Cập nhật status biên bản → delivered (invoiced không tồn tại trong ENUM)
     if (!empty($deliveryIds)) {
         $ph = implode(',', array_fill(0, count($deliveryIds), '?'));
-        $pdo->prepare("UPDATE oqc_deliveries SET status='invoiced' WHERE id IN ($ph)")->execute($deliveryIds);
+        $pdo->prepare("UPDATE oqc_deliveries SET status='delivered' WHERE id IN ($ph)")->execute($deliveryIds);
     }
 
     $pdo->commit();
