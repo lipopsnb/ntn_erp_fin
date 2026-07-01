@@ -77,7 +77,7 @@ try {
     ")->execute([
         $invoiceNo, $invoiceDate, $dueDate, $customerId,
         $subtotal, $vatRate, $vatAmount, $totalAmount,
-        ($deliveryIds[0] ?? $deliveryId), $note, $user['id']
+        null, $note, $user['id']
     ]);
     $invoiceId = $pdo->lastInsertId();
 
