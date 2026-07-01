@@ -48,7 +48,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
             <h6>Danh sách hàng có thể giao</h6>
             <div class="table-responsive">
                 <table class="table table-sm align-middle">
-                    <thead class="table-dark"><tr><th></th><th>Lệnh SX</th><th>Mã hàng</th><th>Tên hàng</th><th>Loại</th><th class="text-end">SL tối đa</th><th class="text-end">SL giao</th></tr></thead>
+                    <thead class="table-dark"><tr><th><input type="checkbox" id="checkAll" class="form-check-input" title="Tích tất cả"></th><th>Lệnh SX</th><th>Mã hàng</th><th>Tên hàng</th><th>Loại</th><th class="text-end">SL tối đa</th><th class="text-end">SL giao</th></tr></thead>
                     <tbody>
                     <?php if(!$items): ?><tr><td colspan="7" class="text-center text-muted py-4">Vui lòng chọn khách hàng để tải dữ liệu</td></tr><?php endif; ?>
                     <?php
@@ -71,7 +71,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                         <td class="text-end">
                             <input type="hidden" name="items[<?= $rowIdx ?>][production_item_id]" value="<?= (int)$it['id'] ?>">
                             <input type="hidden" name="items[<?= $rowIdx ?>][type]" value="done">
-                            <input type="number" step="0.01" min="0" class="form-control form-control-sm row-qty" name="items[<?= $rowIdx ?>][qty_deliver]" value="0">
+                            <input type="number" step="0.01" min="0" class="form-control form-control-sm row-qty" data-max="<?= e((string)$availableDone) ?>" name="items[<?= $rowIdx ?>][qty_deliver]" value="0">
                         </td>
                     </tr>
                     <?php $rowIdx++; endif; ?>
@@ -86,7 +86,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                         <td class="text-end">
                             <input type="hidden" name="items[<?= $rowIdx ?>][production_item_id]" value="<?= (int)$it['id'] ?>">
                             <input type="hidden" name="items[<?= $rowIdx ?>][type]" value="error">
-                            <input type="number" step="0.01" min="0" class="form-control form-control-sm row-qty" name="items[<?= $rowIdx ?>][qty_deliver]" value="0">
+                            <input type="number" step="0.01" min="0" class="form-control form-control-sm row-qty" data-max="<?= e((string)$availableError) ?>" name="items[<?= $rowIdx ?>][qty_deliver]" value="0">
                         </td>
                     </tr>
                     <?php $rowIdx++; endif; ?>
@@ -105,9 +105,24 @@ document.getElementById('customerId').addEventListener('change', function(){
 });
 
 document.querySelectorAll('.pick-row').forEach(chk=>chk.addEventListener('change', function(){
-  const qty = this.closest('tr').querySelector('.row-qty');
-  if(!this.checked) qty.value = '0';
+  const tr = this.closest('tr');
+  const qtyInput = tr.querySelector('.row-qty');
+  if (this.checked) {
+    qtyInput.value = qtyInput.dataset.max || '0';
+  } else {
+    qtyInput.value = '0';
+  }
 }));
+
+const checkAll = document.getElementById('checkAll');
+if (checkAll) {
+  checkAll.addEventListener('change', function(){
+    document.querySelectorAll('.pick-row').forEach(chk => {
+      chk.checked = this.checked;
+      chk.dispatchEvent(new Event('change'));
+    });
+  });
+}
 
 document.getElementById('formDelivery').addEventListener('submit', async function(e){
   e.preventDefault();
