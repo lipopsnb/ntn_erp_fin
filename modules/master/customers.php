@@ -25,8 +25,15 @@ $customers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $csrf = generateCSRF();
 include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/header.php';
 include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
-
 ?>
+
+<style>
+/* Dòng bảng có thể click */
+.table-clickable tbody tr { cursor: pointer; }
+.table-clickable tbody tr:hover td { background-color: #f0f4ff; }
+/* Cột thao tác không trigger click dòng */
+.table-clickable tbody tr td.col-actions { cursor: default; }
+</style>
 
 <div class="main-content">
 <div class="container-fluid py-4">
@@ -34,7 +41,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h4 class="mb-1"><i class="fas fa-users me-2 text-primary"></i>Danh mục khách hàng</h4>
-            <p class="text-muted mb-0">Quản lý thông tin khách hàng</p>
+            <p class="text-muted mb-0">Nhấn vào dòng khách hàng để xem hồ sơ chi tiết</p>
         </div>
         <?php if (hasRole('director','accountant','warehouse','manager')): ?>
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCust">
@@ -71,49 +78,38 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
     <div class="card border-0 shadow-sm">
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
+                <table class="table table-hover align-middle mb-0 table-clickable">
                     <thead class="table-dark">
                         <tr>
                             <th width="50">#</th>
                             <th width="120">Mã KH</th>
                             <th>Tên khách hàng</th>
-                            <th width="150">Người liên hệ</th>
-                            <th width="130">Điện thoại</th>
-                            <th>Địa chỉ</th>
-                            <th width="80">VAT</th>
-                            <th width="80">Trạng thái</th>
-                            <th width="80">Hồ sơ</th>
+                            <th width="80" class="text-center">VAT</th>
+                            <th width="100" class="text-center">Trạng thái</th>
                             <?php if (hasRole('director','accountant','warehouse','manager')): ?>
-                            <th width="100">Thao tác</th>
+                            <th width="110" class="text-center">Thao tác</th>
                             <?php endif; ?>
                         </tr>
                     </thead>
                     <tbody>
                     <?php if (empty($customers)): ?>
-                        <tr><td colspan="<?= hasRole('director','accountant','warehouse','manager') ? 10 : 9 ?>" class="text-center text-muted py-4">Chưa có khách hàng nào</td></tr>
+                        <tr><td colspan="<?= hasRole('director','accountant','warehouse','manager') ? 6 : 5 ?>" class="text-center text-muted py-4">Chưa có khách hàng nào</td></tr>
                     <?php else: ?>
                         <?php foreach ($customers as $i => $c): ?>
-                        <tr>
+                        <tr data-href="customer_profile.php?id=<?= (int)$c['id'] ?>">
                             <td class="text-muted small"><?= $i + 1 ?></td>
-                            <td><span class="badge bg-secondary"><?= htmlspecialchars($c['customer_code'] ?? '—') ?></span></td>
+                            <td><span class="badge bg-secondary fs-6"><?= htmlspecialchars($c['customer_code'] ?? '—') ?></span></td>
                             <td class="fw-semibold"><?= htmlspecialchars($c['customer_name']) ?></td>
-                            <td><?= htmlspecialchars($c['contact_person'] ?? '—') ?></td>
-                            <td><?= htmlspecialchars($c['phone'] ?? '—') ?></td>
-                            <td class="text-muted small"><?= htmlspecialchars($c['address'] ?? '—') ?></td>
                             <td class="text-center"><span class="badge bg-info"><?= (int)($c['vat_rate'] ?? 8) ?>%</span></td>
                             <td class="text-center">
                                 <?= $c['is_active']
                                     ? '<span class="badge bg-success">Đang dùng</span>'
                                     : '<span class="badge bg-secondary">Ngừng</span>' ?>
                             </td>
-                            <td>
-                                <a href="customer_profile.php?id=<?= (int)$c['id'] ?>" class="btn btn-sm btn-outline-primary">
-                                    <i class="fas fa-id-card"></i>
-                                </a>
-                            </td>
                             <?php if (hasRole('director','accountant','warehouse','manager')): ?>
-                            <td>
+                            <td class="text-center col-actions" onclick="event.stopPropagation()">
                                 <button class="btn btn-sm btn-outline-warning btn-edit-cust"
+                                    title="Sửa"
                                     data-id="<?= $c['id'] ?>"
                                     data-code="<?= htmlspecialchars($c['customer_code'] ?? '') ?>"
                                     data-name="<?= htmlspecialchars($c['customer_name']) ?>"
@@ -125,6 +121,14 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                                     data-active="<?= $c['is_active'] ?>">
                                     <i class="fas fa-edit"></i>
                                 </button>
+                                <?php if (hasRole('director','accountant')): ?>
+                                <button class="btn btn-sm btn-outline-danger btn-delete-cust ms-1"
+                                    title="Xoá"
+                                    data-id="<?= $c['id'] ?>"
+                                    data-name="<?= htmlspecialchars($c['customer_name']) ?>">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                                <?php endif; ?>
                             </td>
                             <?php endif; ?>
                         </tr>
@@ -136,6 +140,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
         </div>
         <div class="card-footer text-muted small">
             Tổng: <strong><?= count($customers) ?></strong> khách hàng
+            <span class="ms-2 text-info"><i class="fas fa-info-circle me-1"></i>Nhấn vào dòng để xem hồ sơ chi tiết</span>
         </div>
     </div>
 </div>
@@ -216,6 +221,15 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
 </div>
 
 <script>
+// Click dòng → vào hồ sơ
+document.querySelectorAll('.table-clickable tbody tr[data-href]').forEach(tr => {
+    tr.addEventListener('click', function(e) {
+        if (e.target.closest('.col-actions')) return;
+        location.href = this.dataset.href;
+    });
+});
+
+// Sửa KH
 document.querySelectorAll('.btn-edit-cust').forEach(btn => {
     btn.addEventListener('click', () => {
         document.getElementById('modalCustTitle').innerHTML = '<i class="fas fa-edit me-2"></i>Sửa khách hàng';
@@ -232,10 +246,28 @@ document.querySelectorAll('.btn-edit-cust').forEach(btn => {
     });
 });
 
+// Xoá KH
+document.querySelectorAll('.btn-delete-cust').forEach(btn => {
+    btn.addEventListener('click', () => {
+        if (!confirm(`Xác nhận xoá khách hàng "${btn.dataset.name}"?\nNếu đã có giao dịch, khách hàng sẽ chuyển sang trạng thái Ngừng.`)) return;
+        const fd = new FormData();
+        fd.append('csrf_token', '<?= $csrf ?>');
+        fd.append('action', 'delete');
+        fd.append('id', btn.dataset.id);
+        fetch('/erp/api/master/save_customer.php', { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(d => {
+                if (d.ok) location.reload();
+                else alert('Lỗi: ' + d.msg);
+            });
+    });
+});
+
 document.getElementById('modalCust').addEventListener('hidden.bs.modal', () => {
     document.getElementById('modalCustTitle').innerHTML = '<i class="fas fa-user-plus me-2"></i>Thêm khách hàng';
     document.getElementById('formCust').reset();
-    document.getElementById('custId').value = '';
+    document.getElementById('custId').value  = '';
+    document.getElementById('custVat').value = '8';
 });
 
 document.getElementById('btnSaveCust').addEventListener('click', () => {

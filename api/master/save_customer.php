@@ -21,7 +21,8 @@ $address       = trim($_POST['address'] ?? '') ?: null;
 $contactPerson = trim($_POST['contact_person'] ?? '') ?: null;
 $phone         = trim($_POST['phone'] ?? '') ?: null;
 $email         = trim($_POST['email'] ?? '') ?: null;
-$vatRate       = (int)($_POST['vat_rate'] ?? 8);
+$vatRateInput  = trim((string)($_POST['vat_rate'] ?? ''));
+$vatRate       = $vatRateInput === '' ? 8 : (int)$vatRateInput;
 if (!in_array($vatRate, [0, 5, 8, 10], true)) $vatRate = 8;
 $isActive      = isset($_POST['is_active']) ? 1 : 0;
 
