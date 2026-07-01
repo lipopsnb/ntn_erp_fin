@@ -23,6 +23,7 @@ $contactPerson = trim($_POST['contact_person'] ?? '') ?: null;
 $phone         = trim($_POST['phone'] ?? '') ?: null;
 $vatRate       = (int)($_POST['vat_rate'] ?? 8);
 $email         = trim($_POST['email'] ?? '');
+$emailList     = [];
 $isActive      = isset($_POST['is_active']) ? 1 : 0;
 
 if (!in_array($vatRate, [0, 5, 8, 10], true)) {
@@ -30,8 +31,8 @@ if (!in_array($vatRate, [0, 5, 8, 10], true)) {
 }
 
 if ($email) {
-    $emails = array_filter(array_map('trim', explode(';', $email)));
-    $email  = implode('; ', $emails) ?: null;
+    $emailList = array_filter(array_map('trim', explode(';', $email)));
+    $email     = implode('; ', $emailList) ?: null;
 } else {
     $email = null;
 }
@@ -41,10 +42,9 @@ if ($action !== 'delete' && !$customerName) {
 }
 
 if ($action !== 'delete' && $email) {
-    foreach (explode(';', $email) as $emailItem) {
-        $emailItem = trim($emailItem);
-        if ($emailItem !== '' && !filter_var($emailItem, FILTER_VALIDATE_EMAIL)) {
-            echo json_encode(['ok' => false, 'msg' => 'Email không hợp lệ: ' . $emailItem]); exit;
+    foreach ($emailList as $emailItem) {
+        if (!filter_var($emailItem, FILTER_VALIDATE_EMAIL)) {
+            echo json_encode(['ok' => false, 'msg' => 'Danh sách email có địa chỉ không hợp lệ']); exit;
         }
     }
 }
