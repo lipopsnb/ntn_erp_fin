@@ -154,7 +154,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                 <div class="col-md-2">
                     <div class="form-check mt-2">
                         <input class="form-check-input" type="checkbox" value="1" id="showPaid" name="show_paid" <?= $showPaid ? 'checked' : '' ?>>
-                        <label class="form-check-label small" for="showPaid">Hiện cả HĐ đã TT đủ</label>
+                        <label class="form-check-label small" for="showPaid">Hiển thị cả HĐ đã TT đủ</label>
                     </div>
                 </div>
                 <div class="col-md-1 d-grid">
