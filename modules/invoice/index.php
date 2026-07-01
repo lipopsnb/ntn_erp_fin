@@ -456,6 +456,7 @@ document.getElementById('btnLoadInvoiceData').addEventListener('click', () => {
 
             loadedDeliveries = res.deliveries;
             loadedCustomerId = customerId;
+            document.getElementById('invVat').value = res.vat_rate ?? 8;
 
             // Tổng hợp items: gộp theo product_code_id, cộng dồn SL
             const merged = {};

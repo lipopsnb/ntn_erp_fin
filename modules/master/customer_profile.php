@@ -125,6 +125,9 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                                 <div class="col-md-6"><strong>Địa chỉ:</strong> <?= htmlspecialchars($customer['address'] ?? '—') ?></div>
                                 <div class="col-md-3"><strong>SĐT:</strong> <?= htmlspecialchars($customer['phone'] ?? '—') ?></div>
                                 <div class="col-md-3"><strong>Email:</strong> <?= htmlspecialchars($customer['email'] ?? '—') ?></div>
+                                <div class="col-md-4"><strong>Thuế VAT mặc định:</strong>
+                                    <span class="badge bg-info"><?= (int)($customer['vat_rate'] ?? 8) ?>%</span>
+                                </div>
                                 <div class="col-md-4"><strong>Người liên hệ:</strong> <?= htmlspecialchars($customer['contact_person'] ?? '—') ?></div>
                                 <div class="col-md-4"><strong>Trạng thái:</strong>
                                     <?= !empty($customer['is_active']) ? 'Đang dùng' : 'Ngừng' ?>
@@ -298,6 +301,15 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                         <div class="col-md-4">
                             <label class="form-label fw-semibold">Email</label>
                             <input type="email" name="email" class="form-control" value="<?= htmlspecialchars($customer['email'] ?? '') ?>">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Thuế VAT mặc định</label>
+                            <select name="vat_rate" id="profileVat" class="form-select">
+                                <option value="0" <?= ($customer['vat_rate'] ?? 8) == 0 ? 'selected' : '' ?>>0% (Không chịu thuế)</option>
+                                <option value="5" <?= ($customer['vat_rate'] ?? 8) == 5 ? 'selected' : '' ?>>5%</option>
+                                <option value="8" <?= ($customer['vat_rate'] ?? 8) == 8 ? 'selected' : '' ?>>8%</option>
+                                <option value="10" <?= ($customer['vat_rate'] ?? 8) == 10 ? 'selected' : '' ?>>10%</option>
+                            </select>
                         </div>
                         <div class="col-12">
                             <div class="form-check form-switch">

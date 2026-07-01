@@ -10,6 +10,19 @@ $customerId = (int) ($_GET['customer_id'] ?? 0);
 if (!$customerId) { echo json_encode(['ok' => false, 'msg' => 'Thiếu khách hàng']); exit; }
 
 try {
+    $customerStmt = $pdo->prepare("
+        SELECT id, customer_name, COALESCE(vat_rate, 8) AS vat_rate
+        FROM customers
+        WHERE id = ?
+        LIMIT 1
+    ");
+    $customerStmt->execute([$customerId]);
+    $customer = $customerStmt->fetch(PDO::FETCH_ASSOC);
+    if (!$customer) {
+        echo json_encode(['ok' => false, 'msg' => 'Không tìm thấy khách hàng']);
+        exit;
+    }
+
     // 1. Lấy danh sách biên bản đã xác nhận, chưa xuất HĐ của khách
     $deliveries = $pdo->prepare("
         SELECT d.id, d.delivery_no, d.delivery_date,
@@ -27,7 +40,13 @@ try {
 
     // 2. Lấy tất cả items của những biên bản đó, kèm đơn giá từ customer_prices
     if (empty($deliveries)) {
-        echo json_encode(['ok' => true, 'deliveries' => [], 'items_by_delivery' => []]);
+        echo json_encode([
+            'ok' => true,
+            'customer' => $customer,
+            'vat_rate' => (int)$customer['vat_rate'],
+            'deliveries' => [],
+            'items_by_delivery' => []
+        ]);
         exit;
     }
 
@@ -70,6 +89,8 @@ try {
 
     echo json_encode([
         'ok'               => true,
+        'customer'         => $customer,
+        'vat_rate'         => (int)$customer['vat_rate'],
         'deliveries'       => $deliveries,
         'items_by_delivery' => $itemsByDelivery,
     ]);

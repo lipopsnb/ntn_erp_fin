@@ -80,6 +80,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                             <th width="150">Người liên hệ</th>
                             <th width="130">Điện thoại</th>
                             <th>Địa chỉ</th>
+                            <th width="80">VAT</th>
                             <th width="80">Trạng thái</th>
                             <th width="80">Hồ sơ</th>
                             <?php if (hasRole('director','accountant','warehouse','manager')): ?>
@@ -89,7 +90,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                     </thead>
                     <tbody>
                     <?php if (empty($customers)): ?>
-                        <tr><td colspan="<?= hasRole('director','accountant','warehouse','manager') ? 9 : 8 ?>" class="text-center text-muted py-4">Chưa có khách hàng nào</td></tr>
+                        <tr><td colspan="<?= hasRole('director','accountant','warehouse','manager') ? 10 : 9 ?>" class="text-center text-muted py-4">Chưa có khách hàng nào</td></tr>
                     <?php else: ?>
                         <?php foreach ($customers as $i => $c): ?>
                         <tr>
@@ -99,6 +100,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                             <td><?= htmlspecialchars($c['contact_person'] ?? '—') ?></td>
                             <td><?= htmlspecialchars($c['phone'] ?? '—') ?></td>
                             <td class="text-muted small"><?= htmlspecialchars($c['address'] ?? '—') ?></td>
+                            <td class="text-center"><span class="badge bg-info"><?= (int)($c['vat_rate'] ?? 8) ?>%</span></td>
                             <td class="text-center">
                                 <?= $c['is_active']
                                     ? '<span class="badge bg-success">Đang dùng</span>'
@@ -119,6 +121,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                                     data-contact="<?= htmlspecialchars($c['contact_person'] ?? '') ?>"
                                     data-phone="<?= htmlspecialchars($c['phone'] ?? '') ?>"
                                     data-email="<?= htmlspecialchars($c['email'] ?? '') ?>"
+                                    data-vat="<?= (int)($c['vat_rate'] ?? 8) ?>"
                                     data-active="<?= $c['is_active'] ?>">
                                     <i class="fas fa-edit"></i>
                                 </button>
@@ -183,6 +186,15 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                             <input type="email" name="email" id="custEmail"
                                    class="form-control" placeholder="email@...">
                         </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Thuế VAT mặc định</label>
+                            <select name="vat_rate" id="custVat" class="form-select">
+                                <option value="0">0% (Không chịu thuế)</option>
+                                <option value="5">5%</option>
+                                <option value="8" selected>8%</option>
+                                <option value="10">10%</option>
+                            </select>
+                        </div>
                         <div class="col-12">
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox"
@@ -214,6 +226,7 @@ document.querySelectorAll('.btn-edit-cust').forEach(btn => {
         document.getElementById('custContact').value = btn.dataset.contact;
         document.getElementById('custPhone').value   = btn.dataset.phone;
         document.getElementById('custEmail').value   = btn.dataset.email;
+        document.getElementById('custVat').value     = btn.dataset.vat || '8';
         document.getElementById('custActive').checked = btn.dataset.active == '1';
         new bootstrap.Modal(document.getElementById('modalCust')).show();
     });

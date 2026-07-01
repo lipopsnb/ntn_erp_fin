@@ -40,7 +40,7 @@ if ($deliveryId) {
 
 // Danh sách khách hàng
 $customers = $pdo->query("
-    SELECT id, customer_name, customer_code
+    SELECT id, customer_name, customer_code, COALESCE(vat_rate, 8) AS vat_rate
     FROM customers WHERE is_active = 1 ORDER BY customer_name
 ")->fetchAll(PDO::FETCH_ASSOC);
 
@@ -117,10 +117,10 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                             <label class="form-label fw-semibold">
                                 Khách hàng <span class="text-danger">*</span>
                             </label>
-                            <select name="customer_id" class="form-select" required>
+                            <select name="customer_id" id="customerId" class="form-select" required>
                                 <option value="">-- Chọn KH --</option>
                                 <?php foreach ($customers as $c): ?>
-                                <option value="<?= $c['id'] ?>"
+                                <option value="<?= $c['id'] ?>" data-vat="<?= (int)($c['vat_rate'] ?? 8) ?>"
                                     <?= ($delivery && $delivery['customer_id'] == $c['id']) ? 'selected' : '' ?>>
                                     [<?= htmlspecialchars($c['customer_code']) ?>]
                                     <?= htmlspecialchars($c['customer_name']) ?>
@@ -354,6 +354,18 @@ function updateTotals() {
 }
 
 document.getElementById('vatRate').addEventListener('input', updateTotals);
+
+document.getElementById('customerId').addEventListener('change', function() {
+    const opt = this.options[this.selectedIndex];
+    const vat = opt?.dataset.vat ?? '8';
+    const vatSelect = document.querySelector('[name="vat_rate"]');
+    if (vatSelect) {
+        vatSelect.value = vat;
+        updateTotals();
+    }
+});
+
+document.getElementById('customerId').dispatchEvent(new Event('change'));
 
 // Lưu hoá đơn
 document.getElementById('btnSaveInvoice').addEventListener('click', () => {
