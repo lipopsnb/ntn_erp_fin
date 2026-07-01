@@ -253,7 +253,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                                         <?php endif; ?>
                                     </td>
                                     <td>
-                                        <button class="btn btn-sm btn-outline-warning btn-vat-placeholder" title="Xuất hoá đơn VAT (đang hoàn thiện)" onclick="event.stopPropagation()">
+                                        <button class="btn btn-sm btn-outline-warning btn-vat-placeholder" title="Xuất hóa đơn VAT (đang hoàn thiện)" onclick="event.stopPropagation()">
                                             <i class="fas fa-file-invoice-dollar"></i>
                                         </button>
                                         <?php if ($remaining > 0.01): ?>
@@ -382,7 +382,7 @@ window.addEventListener('load', function() {
     document.querySelectorAll('.btn-vat-placeholder').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            alert('Tính năng xuất hoá đơn VAT đang được hoàn thiện. Vui lòng trở lại sau!');
+            alert('Tính năng xuất hóa đơn VAT đang được hoàn thiện. Vui lòng trở lại sau!');
         });
     });
 
