@@ -86,7 +86,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
             <div class="row g-3">
                 <div class="col-md-4"><label class="form-label">Khách hàng</label><select class="form-select" name="customer_id" id="iqcCustomer" required><option value="">-- Chọn --</option><?php foreach ($customers as $c): ?><option value="<?= (int)$c['id'] ?>"><?= e($c['customer_name']) ?></option><?php endforeach; ?></select></div>
                 <div class="col-md-3"><label class="form-label">Ngày nhận</label><input type="date" class="form-control" name="received_date" value="<?= e(date('Y-m-d')) ?>" required></div>
-                <div class="col-md-3"><label class="form-label">Người nhận</label><select class="form-select" name="received_by" required><?php foreach ($receivers as $u): ?><option value="<?= (int)$u['id'] ?>" <?= currentUserId()===(int)$u['id']?'selected':'' ?>><?= e($u['full_name']) ?></option><?php endforeach; ?></select></div>
+                <div class="col-md-3"><label class="form-label">Người nhận</label><select class="form-select" name="received_by" required><option value="0">-- Chọn người nhận --</option><?php foreach ($receivers as $u): ?><option value="<?= (int)$u['id'] ?>"><?= e($u['full_name']) ?></option><?php endforeach; ?></select></div>
                 <div class="col-md-12"><label class="form-label">Ghi chú</label><textarea class="form-control" name="note" rows="2"></textarea></div>
             </div>
             <hr>
@@ -103,55 +103,129 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
 </div></div></div>
 
 <script>
-const productCodes = <?= json_encode($productCodes, JSON_UNESCAPED_UNICODE) ?>;
-const createModal = new bootstrap.Modal(document.getElementById('modalCreateIqc'));
 const escHtml = (val) => String(val ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 
-function productOptions(customerId, selected){
-  return productCodes.map(pc => {
-    const ids = (pc.customer_ids || '').split(',').filter(Boolean);
-    const visible = !customerId || ids.length === 0 || ids.includes(String(customerId));
-    if(!visible) return '';
-    const sel = String(selected||'')===String(pc.id) ? 'selected' : '';
-    return `<option value="${escHtml(pc.id)}" data-unit="${escHtml(pc.unit||'cái')}" ${sel}>${escHtml(pc.product_code)} - ${escHtml(pc.description)}</option>`;
+let cachedCustomerId = null;
+let cachedProducts = [];
+
+function buildProductOptions(products, selectedId = '') {
+  if (!products.length) {
+    return '<option value="">-- Chưa có sản phẩm --</option>';
+  }
+  return '<option value="">-- Chọn mã hàng --</option>' + products.map(pc => {
+    const sel = String(selectedId) === String(pc.id) ? 'selected' : '';
+    return `<option value="${escHtml(pc.id)}" data-unit="${escHtml(pc.unit || 'cái')}" data-desc="${escHtml(pc.description || '')}" ${sel}>${escHtml(pc.product_code)} — ${escHtml(pc.description)}</option>`;
   }).join('');
 }
-function addItemRow(){
-  const tbody = document.querySelector('#iqcItemsTable tbody');
+
+async function fetchProducts(customerId) {
+  if (!customerId) return [];
+  if (String(customerId) === String(cachedCustomerId)) return cachedProducts;
+  const res = await fetch(`/erp/api/warehouse/get_customer_products.php?customer_id=${encodeURIComponent(customerId)}`);
+  const data = await res.json();
+  if (data.ok) {
+    cachedCustomerId = customerId;
+    cachedProducts = data.products || [];
+  }
+  return data.products || [];
+}
+
+async function rebuildAllProductSelects(customerId) {
+  const products = await fetchProducts(customerId);
+  document.querySelectorAll('#iqcItemsTable tbody select[name="items[][product_code_id]"]').forEach(sel => {
+    const currentVal = sel.value;
+    sel.innerHTML = buildProductOptions(products, currentVal);
+    const tr = sel.closest('tr');
+    const opt = sel.options[sel.selectedIndex];
+    if (tr) {
+      tr.querySelector('.item-desc').textContent = opt?.dataset.desc || '';
+      const unitInput = tr.querySelector('input[name="items[][unit]"]');
+      if (unitInput) unitInput.value = opt?.dataset.unit || 'cái';
+    }
+  });
+}
+
+async function addItemRow() {
   const customerId = document.getElementById('iqcCustomer').value;
+  if (!customerId) {
+    alert('Vui lòng chọn khách hàng trước khi thêm hàng hoá.');
+    return;
+  }
+  const products = await fetchProducts(customerId);
+  const tbody = document.querySelector('#iqcItemsTable tbody');
   const tr = document.createElement('tr');
-  tr.innerHTML = `<td><select class="form-select form-select-sm" name="items[][product_code_id]" required><option value="">-- Mã hàng --</option>${productOptions(customerId,'')}</select></td><td class="item-desc text-muted"></td><td><input type="number" min="0.01" step="0.01" class="form-control form-control-sm" name="items[][qty]" required></td><td><input type="text" class="form-control form-control-sm" name="items[][unit]" value="cái"></td><td><input type="text" class="form-control form-control-sm" name="items[][note]"></td><td><button type="button" class="btn btn-sm btn-outline-danger btn-remove-row"><i class="fas fa-times"></i></button></td>`;
+  tr.innerHTML = `
+    <td><select class="form-select form-select-sm" name="items[][product_code_id]" required>
+      ${buildProductOptions(products)}
+    </select></td>
+    <td><span class="item-desc text-muted small"></span></td>
+    <td><input type="number" class="form-control form-control-sm" name="items[][qty]" min="0.01" step="0.01" required style="width:90px"></td>
+    <td><input type="text" class="form-control form-control-sm" name="items[][unit]" value="cái" style="width:70px" readonly></td>
+    <td><input type="text" class="form-control form-control-sm" name="items[][note]" placeholder="Ghi chú"></td>
+    <td><button type="button" class="btn btn-sm btn-outline-danger btn-remove-row"><i class="fas fa-times"></i></button></td>
+  `;
   tbody.appendChild(tr);
 }
 
 document.getElementById('btnAddRow').addEventListener('click', addItemRow);
-addItemRow();
-document.getElementById('iqcCustomer').addEventListener('change', function(){
-  document.querySelectorAll('#iqcItemsTable tbody select[name="items[][product_code_id]"]').forEach(sel=>{
-    const val = sel.value;
-    sel.innerHTML = `<option value="">-- Mã hàng --</option>${productOptions(this.value,val)}`;
-  });
+
+document.getElementById('iqcCustomer').addEventListener('change', function () {
+  rebuildAllProductSelects(this.value);
 });
 
-document.querySelector('#iqcItemsTable tbody').addEventListener('click', function(e){
-  if(e.target.closest('.btn-remove-row')) e.target.closest('tr').remove();
+document.querySelector('#iqcItemsTable tbody').addEventListener('click', function (e) {
+  if (e.target.closest('.btn-remove-row')) e.target.closest('tr').remove();
 });
-document.querySelector('#iqcItemsTable tbody').addEventListener('change', function(e){
-  if(e.target.matches('select[name="items[][product_code_id]"]')){
+
+document.querySelector('#iqcItemsTable tbody').addEventListener('change', function (e) {
+  if (e.target.matches('select[name="items[][product_code_id]"]')) {
     const opt = e.target.options[e.target.selectedIndex];
     const tr = e.target.closest('tr');
-    tr.querySelector('.item-desc').textContent = opt ? opt.textContent.split(' - ').slice(1).join(' - ') : '';
-    tr.querySelector('input[name="items[][unit]"]').value = opt?.dataset.unit || 'cái';
+    tr.querySelector('.item-desc').textContent = opt?.dataset.desc || '';
+    const unitInput = tr.querySelector('input[name="items[][unit]"]');
+    if (unitInput) unitInput.value = opt?.dataset.unit || 'cái';
   }
 });
 
-document.getElementById('formCreateIqc').addEventListener('submit', async function(e){
+document.getElementById('modalCreateIqc').addEventListener('hidden.bs.modal', function () {
+  document.querySelector('#iqcItemsTable tbody').innerHTML = '';
+  document.getElementById('formCreateIqc').reset();
+  cachedCustomerId = null;
+  cachedProducts = [];
+});
+
+document.getElementById('formCreateIqc').addEventListener('submit', async function (e) {
   e.preventDefault();
+  const receivedBy = document.querySelector('[name="received_by"]').value;
+  if (!receivedBy || receivedBy === '0') { alert('Vui lòng chọn người nhận hàng.'); return; }
+  const rows = document.querySelectorAll('#iqcItemsTable tbody tr');
+  if (!rows.length) { alert('Vui lòng thêm ít nhất 1 mặt hàng.'); return; }
+
+  const btn = this.querySelector('[type="submit"]');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Đang lưu...';
+
   const fd = new FormData(this);
-  const res = await fetch('/erp/api/warehouse/save_iqc.php', {method:'POST', body:fd});
-  const data = await res.json();
-  if(data.ok){ alert('Đã lưu: '+data.receipt_no+' | '+data.order_no); location.reload(); }
-  else alert(data.msg || 'Không thể lưu phiếu IQC');
+  try {
+    const res = await fetch('/erp/api/warehouse/save_iqc.php', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (data.ok) {
+      bootstrap.Modal.getInstance(document.getElementById('modalCreateIqc')).hide();
+      const alert = document.createElement('div');
+      alert.className = 'alert alert-success alert-dismissible fade show position-fixed bottom-0 end-0 m-3';
+      alert.style.zIndex = 9999;
+      alert.innerHTML = `✅ Đã lưu phiếu <strong>${escHtml(data.receipt_no)}</strong> — Lệnh SX: <strong>${escHtml(data.order_no)}</strong> <button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+      document.body.appendChild(alert);
+      setTimeout(() => location.reload(), 2000);
+    } else {
+      alert('Lỗi: ' + (data.msg || 'Không thể lưu phiếu IQC'));
+    }
+  } catch (err) {
+    alert('Lỗi kết nối: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Lưu phiếu IQC';
+  }
 });
 
 document.querySelectorAll('.btn-view-items').forEach(btn=>btn.addEventListener('click', async function(){
