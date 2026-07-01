@@ -18,10 +18,23 @@ $id            = (int)($_POST['id'] ?? 0);
 $customerCode  = strtoupper(trim($_POST['customer_code'] ?? '')) ?: null;
 $customerName  = trim($_POST['customer_name'] ?? '');
 $address       = trim($_POST['address'] ?? '') ?: null;
+$taxCode       = strtoupper(trim($_POST['tax_code'] ?? '')) ?: null;
 $contactPerson = trim($_POST['contact_person'] ?? '') ?: null;
 $phone         = trim($_POST['phone'] ?? '') ?: null;
-$email         = trim($_POST['email'] ?? '') ?: null;
+$vatRate       = (int)($_POST['vat_rate'] ?? 8);
+$email         = trim($_POST['email'] ?? '');
 $isActive      = isset($_POST['is_active']) ? 1 : 0;
+
+if (!in_array($vatRate, [0, 5, 8, 10], true)) {
+    $vatRate = 8;
+}
+
+if ($email) {
+    $emails = array_filter(array_map('trim', explode(';', $email)));
+    $email  = implode('; ', $emails) ?: null;
+} else {
+    $email = null;
+}
 
 if ($action !== 'delete' && !$customerName) {
     echo json_encode(['ok' => false, 'msg' => 'Thiếu tên khách hàng']); exit;
@@ -69,21 +82,21 @@ try {
     if ($id) {
         $stmt = $pdo->prepare("
             UPDATE customers
-            SET customer_code=?, customer_name=?, address=?,
-                contact_person=?, phone=?, email=?, is_active=?, updated_at=NOW()
+            SET customer_code=?, customer_name=?, address=?, tax_code=?,
+                contact_person=?, phone=?, email=?, vat_rate=?, is_active=?, updated_at=NOW()
             WHERE id=?
         ");
         $stmt->execute([$customerCode, $customerName, $address,
-                        $contactPerson, $phone, $email, $isActive, $id]);
+                        $taxCode, $contactPerson, $phone, $email, $vatRate, $isActive, $id]);
         echo json_encode(['ok' => true, 'msg' => 'Đã cập nhật']);
     } else {
         $stmt = $pdo->prepare("
             INSERT INTO customers
-                (customer_code, customer_name, address, contact_person, phone, email, is_active, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (customer_code, customer_name, address, tax_code, contact_person, phone, email, vat_rate, is_active, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([$customerCode, $customerName, $address,
-                        $contactPerson, $phone, $email, $isActive, $user['id']]);
+                        $taxCode, $contactPerson, $phone, $email, $vatRate, $isActive, $user['id']]);
         echo json_encode(['ok' => true, 'msg' => 'Đã thêm mới', 'id' => $pdo->lastInsertId()]);
     }
 } catch (PDOException $e) {
