@@ -19,6 +19,11 @@ $dueDate     = trim($_POST['due_date']      ?? '') ?: null;
 $vatRate     = (float)($_POST['vat_rate']   ?? 0);
 $note        = trim($_POST['note']          ?? '') ?: null;
 $deliveryId  = (int)($_POST['delivery_id']  ?? 0) ?: null;
+$deliveryIds = json_decode($_POST['delivery_ids'] ?? '[]', true);
+$deliveryIds = is_array($deliveryIds) ? array_values(array_unique(array_filter(array_map('intval', $deliveryIds)))) : [];
+if ($deliveryId && !in_array($deliveryId, $deliveryIds, true)) {
+    $deliveryIds[] = $deliveryId;
+}
 $items       = $_POST['items'] ?? [];
 
 if (!$customerId || empty($items)) {
@@ -72,7 +77,7 @@ try {
     ")->execute([
         $invoiceNo, $invoiceDate, $dueDate, $customerId,
         $subtotal, $vatRate, $vatAmount, $totalAmount,
-        $deliveryId, $note, $user['id']
+        ($deliveryIds[0] ?? $deliveryId), $note, $user['id']
     ]);
     $invoiceId = $pdo->lastInsertId();
 
@@ -90,8 +95,9 @@ try {
     }
 
     // Cập nhật status biên bản → invoiced
-    if ($deliveryId) {
-        $pdo->prepare("UPDATE deliveries SET status='invoiced' WHERE id=?")->execute([$deliveryId]);
+    if (!empty($deliveryIds)) {
+        $ph = implode(',', array_fill(0, count($deliveryIds), '?'));
+        $pdo->prepare("UPDATE oqc_deliveries SET status='invoiced' WHERE id IN ($ph)")->execute($deliveryIds);
     }
 
     $pdo->commit();

@@ -46,7 +46,10 @@ $totalPaid   = array_sum(array_column($invoices, 'paid_amount'));
 $totalDebt   = $totalAmount - $totalPaid;
 
 $customers = $pdo->query("
-    SELECT id, customer_name, customer_code FROM customers WHERE is_active=1 ORDER BY customer_name
+    SELECT id, customer_name, customer_code, COALESCE(vat_rate, 8) AS vat_rate
+    FROM customers
+    WHERE is_active = 1
+    ORDER BY customer_name
 ")->fetchAll(PDO::FETCH_ASSOC);
 
 $csrf = generateCSRF();
@@ -241,6 +244,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                                     <option value="">-- Chọn khách hàng --</option>
                                     <?php foreach ($customers as $c): ?>
                                     <option value="<?= $c['id'] ?>"
+                                            data-vat="<?= (int)($c['vat_rate'] ?? 8) ?>"
                                             data-name="<?= htmlspecialchars($c['customer_name']) ?>">
                                         [<?= htmlspecialchars($c['customer_code']) ?>]
                                         <?= htmlspecialchars($c['customer_name']) ?>
@@ -260,7 +264,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                             </div>
                             <div class="col-md-2">
                                 <label class="form-label fw-semibold">Thuế VAT (%)</label>
-                                <input type="number" id="invVat" class="form-control" value="0" min="0" max="100">
+                                <input type="number" id="invVat" class="form-control" value="8" min="0" max="100">
                             </div>
                             <div class="col-md-2">
                                 <button type="button" class="btn btn-primary w-100" id="btnLoadInvoiceData">
@@ -330,6 +334,11 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                     <div id="invNoPriceWarning" class="d-none alert alert-warning py-2 small">
                         <i class="fas fa-exclamation-triangle me-1"></i>
                         <span id="invNoPriceList"></span>
+                    </div>
+                    <div class="d-flex gap-2 mt-2 mb-3">
+                        <button type="button" class="btn btn-outline-success" id="btnExportBke">
+                            <i class="fas fa-file-excel me-1"></i>Xuất bảng kê Excel (gửi KH)
+                        </button>
                     </div>
                 </div>
 
@@ -412,6 +421,12 @@ const CSRF_TOKEN = <?= json_encode($csrf) ?>;
 let loadedItems      = [];   // [{product_code_id, product_code, description, unit, quantity, unit_price, total_price}]
 let loadedDeliveries = [];   // danh sách biên bản
 let loadedCustomerId = null;
+
+document.getElementById('invCustomerSelect').addEventListener('change', function() {
+    const opt = this.options[this.selectedIndex];
+    document.getElementById('invVat').value = opt?.dataset.vat ?? '8';
+    updateTotals();
+});
 
 // ── Reset modal khi mở lại ──
 document.getElementById('modalInvoice').addEventListener('show.bs.modal', () => {
@@ -566,6 +581,17 @@ function updateTotals() {
 }
 
 document.getElementById('invVat').addEventListener('input', updateTotals);
+
+document.getElementById('btnExportBke')?.addEventListener('click', () => {
+    const customerId = loadedCustomerId;
+    const fromDate   = document.getElementById('invFromDate').value;
+    const toDate     = document.getElementById('invToDate').value;
+    if (!customerId || !fromDate || !toDate) { alert('Chưa có dữ liệu!'); return; }
+    window.open(
+        `/erp/api/invoice/export_bke_excel.php?customer_id=${encodeURIComponent(customerId)}&from=${encodeURIComponent(fromDate)}&to=${encodeURIComponent(toDate)}`,
+        '_blank'
+    );
+});
 
 // ── Lưu hoá đơn ──
 document.getElementById('btnSaveInvoice').addEventListener('click', () => {
