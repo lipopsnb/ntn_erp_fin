@@ -129,6 +129,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
         <div class="card-body py-2">
             <form class="row g-2 align-items-center" method="GET">
                 <div class="col-md-3">
+                    <label class="form-label form-label-sm mb-1 small text-muted fw-semibold">Khách hàng</label>
                     <select name="customer_id" class="form-select form-select-sm">
                         <option value="0">-- Tất cả khách hàng --</option>
                         <?php foreach ($customers as $c): ?>
@@ -139,6 +140,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                     </select>
                 </div>
                 <div class="col-md-2">
+                    <label class="form-label form-label-sm mb-1 small text-muted fw-semibold">Trạng thái</label>
                     <select name="status" class="form-select form-select-sm">
                         <option value="all" <?= $filterStatus === 'all' ? 'selected' : '' ?>>Tất cả</option>
                         <option value="unpaid" <?= $filterStatus === 'unpaid' ? 'selected' : '' ?>>Chưa TT</option>
@@ -146,18 +148,21 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                     </select>
                 </div>
                 <div class="col-md-2">
+                    <label class="form-label form-label-sm mb-1 small text-muted fw-semibold">Từ ngày</label>
                     <input type="date" name="from" class="form-control form-control-sm" value="<?= htmlspecialchars($filterFrom) ?>">
                 </div>
                 <div class="col-md-2">
+                    <label class="form-label form-label-sm mb-1 small text-muted fw-semibold">Đến ngày</label>
                     <input type="date" name="to" class="form-control form-control-sm" value="<?= htmlspecialchars($filterTo) ?>">
                 </div>
                 <div class="col-md-2">
-                    <div class="form-check mt-2">
+                    <label class="form-label form-label-sm mb-1 small text-muted fw-semibold d-block">Tùy chọn</label>
+                    <div class="form-check">
                         <input class="form-check-input" type="checkbox" value="1" id="showPaid" name="show_paid" <?= $showPaid ? 'checked' : '' ?>>
-                        <label class="form-check-label small" for="showPaid">Hiển thị cả HĐ đã TT đủ</label>
+                        <label class="form-check-label small" for="showPaid">Hiển thị đã TT</label>
                     </div>
                 </div>
-                <div class="col-md-1 d-grid">
+                <div class="col-md-1 d-grid pt-md-4">
                     <button class="btn btn-sm btn-primary"><i class="fas fa-filter me-1"></i>Lọc</button>
                 </div>
             </form>
@@ -167,24 +172,28 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
     <div class="row g-3 mb-3">
         <div class="col-md-3">
             <div class="card border-0 shadow-sm text-center py-3">
+                <div class="mb-1"><i class="fas fa-hand-holding-usd text-danger"></i></div>
                 <div class="text-muted small">Tổng công nợ</div>
                 <div class="fs-5 fw-bold text-danger"><?= number_format($summary['total_debt']) ?> đ</div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="card border-0 shadow-sm text-center py-3">
+                <div class="mb-1"><i class="fas fa-clock text-warning"></i></div>
                 <div class="text-muted small">Quá hạn 0-30 ngày</div>
-                <div class="fs-5 fw-bold text-success"><?= number_format($summary['bucket_0_30']) ?> đ</div>
+                <div class="fs-5 fw-bold text-warning"><?= number_format($summary['bucket_0_30']) ?> đ</div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="card border-0 shadow-sm text-center py-3">
+                <div class="mb-1"><i class="fas fa-exclamation-circle" style="color:#fd7e14"></i></div>
                 <div class="text-muted small">Quá hạn 31-60 ngày</div>
-                <div class="fs-5 fw-bold text-warning"><?= number_format($summary['bucket_31_60']) ?> đ</div>
+                <div class="fs-5 fw-bold" style="color:#fd7e14"><?= number_format($summary['bucket_31_60']) ?> đ</div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="card border-0 shadow-sm text-center py-3">
+                <div class="mb-1"><i class="fas fa-exclamation-triangle text-danger"></i></div>
                 <div class="text-muted small">Quá hạn &gt;60 ngày</div>
                 <div class="fs-5 fw-bold text-danger"><?= number_format($summary['bucket_60_plus']) ?> đ</div>
             </div>
@@ -204,21 +213,22 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                                     <th>Hạn TT</th>
                                     <th>Khách hàng</th>
                                     <th class="text-end">Tổng HĐ</th>
-                                    <th class="text-end">Đã TT</th>
-                                    <th class="text-end">Còn nợ</th>
-                                    <th>Tuổi nợ</th>
+                                    <th class="text-end">Công nợ</th>
+                                    <th>Số ngày quá hạn</th>
                                     <th>Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody>
                             <?php if (empty($rows)): ?>
-                                <tr><td colspan="9" class="text-center text-muted py-4">Không có công nợ phù hợp</td></tr>
+                                <tr><td colspan="8" class="text-center text-muted py-4">Không có công nợ phù hợp</td></tr>
                             <?php else: ?>
                                 <?php foreach ($rows as $r):
                                     $remaining = (float)$r['remaining'];
                                     $daysOverdue = (int)$r['days_overdue'];
                                 ?>
-                                <tr class="<?= debtRowClass($daysOverdue) ?>">
+                                <tr class="<?= debtRowClass($daysOverdue) ?>"
+                                    style="cursor:pointer"
+                                    onclick="window.location='invoice_detail.php?id=<?= (int)$r['id'] ?>'">
                                     <td class="fw-semibold text-primary"><?= htmlspecialchars($r['invoice_no']) ?></td>
                                     <td><?= $r['invoice_date'] ? date('d/m/Y', strtotime($r['invoice_date'])) : '—' ?></td>
                                     <td><?= $r['due_date'] ? date('d/m/Y', strtotime($r['due_date'])) : '—' ?></td>
@@ -227,23 +237,36 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                                         <div class="text-muted small"><?= htmlspecialchars($r['customer_code'] ?? '') ?></div>
                                     </td>
                                     <td class="text-end"><?= number_format($r['total_amount']) ?> đ</td>
-                                    <td class="text-end text-success"><?= number_format($r['paid_amount']) ?> đ</td>
-                                    <td class="text-end fw-bold <?= $remaining > 0.01 ? 'text-danger' : 'text-success' ?>"><?= number_format($remaining) ?> đ</td>
-                                    <td><?= overdueBadge($daysOverdue) ?: '<span class="text-muted small">Trong hạn</span>' ?></td>
+                                    <td class="text-end">
+                                        <div class="fw-bold <?= $remaining > 0.01 ? 'text-danger' : 'text-success' ?>">
+                                            <?= number_format($remaining) ?> đ còn nợ
+                                        </div>
+                                        <div class="text-muted small">
+                                            (đã thu: <?= number_format($r['paid_amount']) ?> đ / tổng: <?= number_format($r['total_amount']) ?> đ)
+                                        </div>
+                                    </td>
                                     <td>
-                                        <a href="invoice_detail.php?id=<?= (int)$r['id'] ?>" class="btn btn-sm btn-outline-primary" title="Xem HĐ">
-                                            <i class="fas fa-eye"></i>
-                                        </a>
+                                        <?php if ($daysOverdue > 0): ?>
+                                            <span class="fw-semibold text-danger"><?= $daysOverdue ?> ngày</span>
+                                        <?php else: ?>
+                                            <span class="text-muted small">Trong hạn</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-warning btn-vat-placeholder" title="Xuất hóa đơn VAT (đang hoàn thiện)" onclick="event.stopPropagation()">
+                                            <i class="fas fa-file-invoice-dollar"></i>
+                                        </button>
                                         <?php if ($remaining > 0.01): ?>
                                         <button class="btn btn-sm btn-outline-success btn-pay"
                                                 data-id="<?= (int)$r['id'] ?>"
                                                 data-no="<?= htmlspecialchars($r['invoice_no']) ?>"
                                                 data-debt="<?= (float)$remaining ?>"
-                                                title="Ghi thu">
+                                                title="Ghi thu"
+                                                onclick="event.stopPropagation()">
                                             <i class="fas fa-money-bill-wave"></i>
                                         </button>
                                         <?php endif; ?>
-                                        <a href="/erp/api/invoice/print_invoice.php?id=<?= (int)$r['id'] ?>" target="_blank" class="btn btn-sm btn-outline-secondary" title="In HĐ">
+                                        <a href="/erp/api/invoice/print_invoice.php?id=<?= (int)$r['id'] ?>" target="_blank" class="btn btn-sm btn-outline-secondary" title="In HĐ" onclick="event.stopPropagation()">
                                             <i class="fas fa-print"></i>
                                         </a>
                                     </td>
@@ -270,9 +293,21 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                                 <tr><td class="text-center text-muted py-3">Không có dữ liệu</td></tr>
                             <?php else: ?>
                                 <?php foreach ($customerDebt as $customerLabel => $amount): ?>
+                                <?php
+                                    $percent = $summary['total_debt'] > 0 ? ($amount / $summary['total_debt']) * 100 : 0;
+                                    $barClass = $percent >= 50 ? 'bg-danger' : ($percent >= 20 ? 'bg-warning' : 'bg-success');
+                                ?>
                                 <tr>
-                                    <td class="small"><?= htmlspecialchars($customerLabel) ?></td>
-                                    <td class="text-end fw-semibold text-danger"><?= number_format($amount) ?> đ</td>
+                                    <td>
+                                        <div class="small fw-semibold"><?= htmlspecialchars($customerLabel) ?></div>
+                                        <div class="progress mt-1" style="height:4px">
+                                            <div class="progress-bar <?= $barClass ?>" style="width:<?= min(100, round($percent, 2)) ?>%"></div>
+                                        </div>
+                                    </td>
+                                    <td class="text-end text-danger fw-semibold small">
+                                        <?= number_format($amount) ?> đ<br>
+                                        <span class="text-muted" style="font-size:11px"><?= round($percent, 1) ?>%</span>
+                                    </td>
                                 </tr>
                                 <?php endforeach; ?>
                             <?php endif; ?>
@@ -333,39 +368,48 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
 </div>
 
 <script>
-document.querySelectorAll('.btn-pay').forEach(btn => {
-    btn.addEventListener('click', () => {
-        document.getElementById('payInvoiceId').value = btn.dataset.id;
-        document.getElementById('payInvoiceNo').value = btn.dataset.no;
-        document.getElementById('payAmount').value = btn.dataset.debt;
-        document.getElementById('payDebtInfo').textContent = 'Còn nợ: ' + Number(btn.dataset.debt || 0).toLocaleString('vi-VN') + ' đ';
-        new bootstrap.Modal(document.getElementById('modalPay')).show();
-    });
-});
-
-document.getElementById('btnSavePay').addEventListener('click', () => {
-    const form = document.getElementById('formPay');
-    if (!form.checkValidity()) { form.reportValidity(); return; }
-
-    const btn = document.getElementById('btnSavePay');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Đang lưu...';
-
-    fetch('/erp/api/invoice/save_payment.php', { method: 'POST', body: new FormData(form) })
-        .then(r => r.json())
-        .then(res => {
-            if (res.ok) {
-                bootstrap.Modal.getInstance(document.getElementById('modalPay')).hide();
-                location.reload();
-            } else {
-                alert('Lỗi: ' + res.msg);
-            }
-        })
-        .catch(() => alert('Lỗi kết nối!'))
-        .finally(() => {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-save me-1"></i>Lưu';
+window.addEventListener('load', function() {
+    document.querySelectorAll('.btn-pay').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.getElementById('payInvoiceId').value = btn.dataset.id;
+            document.getElementById('payInvoiceNo').value = btn.dataset.no;
+            document.getElementById('payAmount').value = btn.dataset.debt;
+            document.getElementById('payDebtInfo').textContent = 'Còn nợ: ' + Number(btn.dataset.debt || 0).toLocaleString('vi-VN') + ' đ';
+            new bootstrap.Modal(document.getElementById('modalPay')).show();
         });
+    });
+
+    document.querySelectorAll('.btn-vat-placeholder').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            alert('Tính năng xuất hóa đơn VAT đang được hoàn thiện. Vui lòng trở lại sau!');
+        });
+    });
+
+    document.getElementById('btnSavePay').addEventListener('click', () => {
+        const form = document.getElementById('formPay');
+        if (!form.checkValidity()) { form.reportValidity(); return; }
+
+        const btn = document.getElementById('btnSavePay');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Đang lưu...';
+
+        fetch('/erp/api/invoice/save_payment.php', { method: 'POST', body: new FormData(form) })
+            .then(r => r.json())
+            .then(res => {
+                if (res.ok) {
+                    bootstrap.Modal.getInstance(document.getElementById('modalPay')).hide();
+                    location.reload();
+                } else {
+                    alert('Lỗi: ' + res.msg);
+                }
+            })
+            .catch(() => alert('Lỗi kết nối!'))
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-save me-1"></i>Lưu';
+            });
+    });
 });
 </script>
 <?php include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/footer.php'; ?>
