@@ -38,9 +38,8 @@ if ($customerId <= 0 || $deliveryDate === '' || !$validItems) {
 }
 
 try {
-    $pdo->beginTransaction();
-
     $deliveryNo = generateDocNo($pdo, 'DEL');
+    $pdo->beginTransaction();
     $pdo->prepare('INSERT INTO oqc_deliveries (delivery_no, customer_id, delivery_date, sender_name, vehicle_plate, driver_name, note, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
         ->execute([$deliveryNo, $customerId, $deliveryDate, $senderName, $vehiclePlate, $driverName, $note, 'draft', currentUserId()]);
     $deliveryId = (int)$pdo->lastInsertId();

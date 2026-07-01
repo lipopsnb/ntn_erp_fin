@@ -145,6 +145,8 @@ elseif (isGroupActive(['/modules/users/index'])) $activeGroup = 'system';
           <i class="fas fa-boxes"></i><span>Kho thành phẩm OQC</span></a></li>
         <li><a class="nav-link <?= isActive('/warehouse/oqc_delivery') ?>" href="/erp/modules/warehouse/oqc_delivery.php">
           <i class="fas fa-truck"></i><span>Xuất kho / Giao hàng</span></a></li>
+        <li><a class="nav-link <?= isActive('/warehouse/delivery_history') ?>" href="/erp/modules/warehouse/delivery_history.php">
+          <i class="fas fa-history"></i><span>Lịch sử giao hàng</span></a></li>
       </ul>
     </li>
     <?php endif; ?>
