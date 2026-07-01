@@ -125,7 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 0
             );
             if ($relatedCount > 0) {
-                setFlash('danger', 'Xe đang có dữ liệu liên quan, không thể xoá.');
+                setFlash('danger', 'Không thể xoá xe này vì đã có lịch sử sử dụng hoặc đổ dầu. Vui lòng xoá các dữ liệu liên quan trước.');
             } else {
                 $pdo->prepare('DELETE FROM vehicles WHERE id = ?')->execute([$id]);
                 setFlash('success', 'Đã xoá phương tiện.');
@@ -237,6 +237,18 @@ if ($filterStatus !== '') {
     $params[] = $filterStatus;
 }
 $vehicles = fetchAllSafe($pdo, 'SELECT * FROM vehicles WHERE ' . implode(' AND ', $where) . ' ORDER BY created_at DESC, id DESC', $params);
+$vehicleIdsWithData = [];
+if ($vehicles) {
+    $ids = implode(',', array_map(fn($v) => (int)$v['id'], $vehicles));
+    $rows = fetchAllSafe($pdo,
+        "SELECT vehicle_id FROM (
+            SELECT vehicle_id FROM vehicle_fuel WHERE vehicle_id IN ($ids)
+            UNION
+            SELECT vehicle_id FROM vehicle_trips WHERE vehicle_id IN ($ids)
+        ) t GROUP BY vehicle_id"
+    );
+    $vehicleIdsWithData = array_column($rows, 'vehicle_id');
+}
 if ($selectedVehicleId <= 0 && !empty($vehicles[0]['id'])) {
     $selectedVehicleId = (int)$vehicles[0]['id'];
 }
@@ -334,7 +346,8 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                     <?php else: ?>
                         <?php foreach ($vehicles as $vehicle): ?>
                             <?php [$badgeClass, $statusLabel] = $statusMap[$vehicle['status']] ?? ['secondary', $vehicle['status']]; ?>
-                            <tr>
+                            <?php $hasRelated = in_array((int)$vehicle['id'], $vehicleIdsWithData, false); ?>
+                            <tr style="cursor:pointer" onclick="window.location='/erp/<?= e($vehiclesPageUrl(['id' => (int)$vehicle['id'], 'tab' => 'info'])) ?>'">
                                 <td class="fw-semibold text-primary"><?= e($vehicle['plate_number']) ?></td>
                                 <td><?= e($vehicle['vehicle_name']) ?></td>
                                 <td><?= e(trim(($vehicle['brand'] ?? '') . ' ' . ($vehicle['model'] ?? '')) ?: '—') ?></td>
@@ -342,14 +355,17 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                                 <td><span class="badge bg-<?= $badgeClass ?>"><?= e($statusLabel) ?></span></td>
                                 <td>
                                     <div class="d-flex flex-wrap gap-1">
-                                        <a href="/erp/<?= e($vehiclesPageUrl(['id' => (int)$vehicle['id'], 'tab' => 'info'])) ?>" class="btn btn-sm <?= $selectedVehicleId === (int)$vehicle['id'] ? 'btn-primary' : 'btn-outline-primary' ?>">Xem chi tiết</a>
-                                        <a href="/erp/<?= e($vehiclesPageUrl(['id' => (int)$vehicle['id'], 'action' => 'edit', 'show_form' => 1])) ?>#vehicle-form-card" class="btn btn-sm btn-outline-warning">Sửa</a>
-                                        <form method="post" class="d-inline">
-                                            <?= csrfInput() ?>
-                                            <input type="hidden" name="action" value="delete">
-                                            <input type="hidden" name="id" value="<?= (int)$vehicle['id'] ?>">
-                                            <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Xoá phương tiện này?');">Xóa</button>
-                                        </form>
+                                        <a href="/erp/<?= e($vehiclesPageUrl(['id' => (int)$vehicle['id'], 'action' => 'edit', 'show_form' => 1])) ?>#vehicle-form-card" class="btn btn-sm btn-outline-warning" onclick="event.stopPropagation()">Sửa</a>
+                                        <?php if ($hasRelated): ?>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" disabled title="Không thể xoá: xe đã có lịch sử sử dụng hoặc đổ dầu" data-bs-toggle="tooltip" onclick="event.stopPropagation()">Xóa</button>
+                                        <?php else: ?>
+                                            <form method="post" class="d-inline" onclick="event.stopPropagation()">
+                                                <?= csrfInput() ?>
+                                                <input type="hidden" name="action" value="delete">
+                                                <input type="hidden" name="id" value="<?= (int)$vehicle['id'] ?>">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); return confirm('Xoá phương tiện này?');">Xóa</button>
+                                            </form>
+                                        <?php endif; ?>
                                     </div>
                                 </td>
                             </tr>
