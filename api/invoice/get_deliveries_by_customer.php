@@ -7,22 +7,31 @@ requireRole('director', 'accountant', 'manager');
 
 $pdo        = getDBConnection();
 $customerId = (int) ($_GET['customer_id'] ?? 0);
+$fromDate   = trim((string)($_GET['from'] ?? date('Y-m-01')));
+$toDate     = trim((string)($_GET['to'] ?? date('Y-m-d')));
 if (!$customerId) { echo json_encode(['ok' => false, 'msg' => 'Thiếu khách hàng']); exit; }
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fromDate) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $toDate)) {
+    echo json_encode(['ok' => false, 'msg' => 'Khoảng ngày không hợp lệ']); exit;
+}
+if ($fromDate > $toDate) {
+    echo json_encode(['ok' => false, 'msg' => 'Từ ngày không được lớn hơn đến ngày']); exit;
+}
 
 try {
-    // 1. Lấy danh sách biên bản đã xác nhận, chưa xuất HĐ của khách
+    // 1. Lấy danh sách biên bản chưa xuất HĐ của khách trong khoảng ngày
     $deliveries = $pdo->prepare("
         SELECT d.id, d.delivery_no, d.delivery_date,
                COUNT(di.id) AS item_count,
-               COALESCE(SUM(di.quantity), 0) AS total_qty
-        FROM deliveries d
-        LEFT JOIN delivery_items di ON di.delivery_id = d.id
+               COALESCE(SUM(CASE WHEN di.type = 'done' THEN di.qty_deliver ELSE 0 END), 0) AS total_qty
+        FROM oqc_deliveries d
+        LEFT JOIN oqc_delivery_items di ON di.delivery_id = d.id
         WHERE d.customer_id = ?
-          AND d.status = 'confirmed'
+          AND d.status <> 'invoiced'
+          AND d.delivery_date BETWEEN ? AND ?
         GROUP BY d.id
         ORDER BY d.delivery_date DESC, d.id DESC
     ");
-    $deliveries->execute([$customerId]);
+    $deliveries->execute([$customerId, $fromDate, $toDate]);
     $deliveries = $deliveries->fetchAll(PDO::FETCH_ASSOC);
 
     // 2. Lấy tất cả items của những biên bản đó, kèm đơn giá từ customer_prices
@@ -36,25 +45,30 @@ try {
 
     $itemsStmt = $pdo->prepare("
         SELECT di.delivery_id,
-               di.product_code_id,
+               pc.id AS product_code_id,
                pc.product_code,
                pc.description,
-               pc.unit,
-               di.quantity,
+               iri.unit,
+               di.qty_deliver AS quantity,
                COALESCE(
                    (SELECT cp.unit_price
                     FROM customer_prices cp
-                    WHERE cp.customer_id   = ?
-                      AND cp.product_code_id = di.product_code_id
+                    WHERE cp.customer_id    = ?
+                      AND cp.product_code_id = iri.product_code_id
+                      AND cp.effective_date <= d.delivery_date
+                      AND (cp.expired_date IS NULL OR cp.expired_date >= d.delivery_date)
                       AND cp.is_active = 1
-                    ORDER BY cp.id DESC
+                    ORDER BY cp.effective_date DESC, cp.id DESC
                     LIMIT 1),
-                   di.unit_price,
-                   0
+                  0
                ) AS unit_price
-        FROM delivery_items di
-        JOIN product_codes pc ON pc.id = di.product_code_id
+        FROM oqc_delivery_items di
+        JOIN oqc_deliveries d ON d.id = di.delivery_id
+        JOIN production_items pi ON di.production_item_id = pi.id
+        JOIN iqc_receipt_items iri ON pi.iqc_item_id = iri.id
+        JOIN product_codes pc ON pc.id = iri.product_code_id
         WHERE di.delivery_id IN ($placeholders)
+          AND di.type = 'done'
         ORDER BY di.delivery_id, di.id
     ");
     $params = array_merge([$customerId], $deliveryIds);
