@@ -112,6 +112,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                                     data-code="<?= htmlspecialchars($c['customer_code'] ?? '') ?>"
                                     data-name="<?= htmlspecialchars($c['customer_name']) ?>"
                                     data-address="<?= htmlspecialchars($c['address'] ?? '') ?>"
+                                    data-tax="<?= htmlspecialchars($c['tax_code'] ?? '') ?>"
                                     data-contact="<?= htmlspecialchars($c['contact_person'] ?? '') ?>"
                                     data-phone="<?= htmlspecialchars($c['phone'] ?? '') ?>"
                                     data-email="<?= htmlspecialchars($c['email'] ?? '') ?>"
@@ -159,13 +160,13 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                     <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
                     <input type="hidden" name="id" id="custId" value="">
                     <div class="row g-3">
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label fw-semibold">Mã khách hàng</label>
                             <input type="text" name="customer_code" id="custCode"
                                    class="form-control text-uppercase" placeholder="VD: KH-001">
                         </div>
-                        <div class="col-md-8">
-                            <label class="form-label fw-semibold">Tên khách hàng <span class="text-danger">*</span></label>
+                        <div class="col-md-9">
+                            <label class="form-label fw-semibold">Tên công ty <span class="text-danger">*</span></label>
                             <input type="text" name="customer_name" id="custName"
                                    class="form-control" placeholder="Tên công ty hoặc cá nhân" required>
                         </div>
@@ -175,19 +176,9 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                                    class="form-control" placeholder="Địa chỉ đầy đủ">
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">Người liên hệ</label>
-                            <input type="text" name="contact_person" id="custContact"
-                                   class="form-control" placeholder="Họ tên người liên hệ">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Điện thoại</label>
-                            <input type="text" name="phone" id="custPhone"
-                                   class="form-control" placeholder="0909...">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Email</label>
-                            <input type="email" name="email" id="custEmail"
-                                   class="form-control" placeholder="email@...">
+                            <label class="form-label fw-semibold">Mã số thuế</label>
+                            <input type="text" name="tax_code" id="custTaxCode"
+                                   class="form-control" placeholder="VD: 0123456789">
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-semibold">Thuế VAT mặc định</label>
@@ -197,6 +188,26 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                                 <option value="8" selected>8%</option>
                                 <option value="10">10%</option>
                             </select>
+                        </div>
+                        <div class="col-md-4"></div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Người liên hệ</label>
+                            <input type="text" name="contact_person" id="custContact"
+                                   class="form-control" placeholder="Họ tên người liên hệ">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Điện thoại <span class="text-muted small">(hiện trên biên bản giao hàng)</span></label>
+                            <input type="text" name="phone" id="custPhone"
+                                   class="form-control" placeholder="0909...">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">
+                                Email nhận hoá đơn
+                                <span class="text-muted small">(nhiều email ngăn cách bằng dấu <code>;</code>)</span>
+                            </label>
+                            <textarea name="email" id="custEmail" class="form-control" rows="2"
+                                      placeholder="email1@example.com; email2@example.com"></textarea>
+                            <div class="form-text">Hệ thống sẽ gửi hoá đơn đến tất cả email này.</div>
                         </div>
                         <div class="col-12">
                             <div class="form-check form-switch">
@@ -235,6 +246,7 @@ document.querySelectorAll('.btn-edit-cust').forEach(btn => {
         document.getElementById('custCode').value    = btn.dataset.code;
         document.getElementById('custName').value    = btn.dataset.name;
         document.getElementById('custAddress').value = btn.dataset.address;
+        document.getElementById('custTaxCode').value = btn.dataset.tax || '';
         document.getElementById('custContact').value = btn.dataset.contact;
         document.getElementById('custPhone').value   = btn.dataset.phone;
         document.getElementById('custEmail').value   = btn.dataset.email;

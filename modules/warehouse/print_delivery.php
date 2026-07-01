@@ -7,7 +7,7 @@ requireRole('director', 'accountant', 'warehouse', 'production', 'manager');
 $pdo = getDBConnection();
 
 $id = (int)($_GET['id'] ?? 0);
-$delivery = fetchOneSafe($pdo, "SELECT d.*, c.customer_name, c.address, c.phone
+$delivery = fetchOneSafe($pdo, "SELECT d.*, c.customer_name, c.address, c.phone, c.tax_code
                               FROM oqc_deliveries d
                               LEFT JOIN customers c ON d.customer_id = c.id
                               WHERE d.id = ?", [$id]);
@@ -54,7 +54,8 @@ body{font-family:DejaVu Sans,Arial,sans-serif;color:#222;font-size:14px}.wrap{ma
         <div class="box">
             <div><strong>Khách hàng:</strong> <?= e($delivery['customer_name']) ?></div>
             <div><strong>Địa chỉ:</strong> <?= e($delivery['address']) ?></div>
-            <div><strong>Điện thoại:</strong> <?= e($delivery['phone']) ?></div>
+            <div><strong>SĐT:</strong> <?= e($delivery['phone'] ?? '—') ?></div>
+            <div><strong>MST:</strong> <?= e($delivery['tax_code'] ?? '—') ?></div>
         </div>
         <div class="box">
             <div><strong>Ngày giao:</strong> <?= e(formatDate($delivery['delivery_date'])) ?></div>

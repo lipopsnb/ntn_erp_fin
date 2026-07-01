@@ -81,7 +81,16 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                     <hr>
                     <div class="small">
                         <div class="mb-2"><i class="fas fa-phone me-2 text-muted"></i><?= htmlspecialchars($customer['phone'] ?? '—') ?></div>
-                        <div class="mb-2"><i class="fas fa-envelope me-2 text-muted"></i><?= htmlspecialchars($customer['email'] ?? '—') ?></div>
+                        <div class="mb-2">
+                            <i class="fas fa-envelope me-2 text-muted"></i>
+                            <?php if (!empty($customer['email'])): ?>
+                                <?php foreach (explode(';', $customer['email']) as $em): $em = trim($em); if (!$em) continue; ?>
+                                    <div class="ms-4"><a href="mailto:<?= htmlspecialchars($em) ?>"><?= htmlspecialchars($em) ?></a></div>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                —
+                            <?php endif; ?>
+                        </div>
                         <div class="mb-2"><i class="fas fa-map-marker-alt me-2 text-muted"></i><?= htmlspecialchars($customer['address'] ?? '—') ?></div>
                         <div class="mb-2"><i class="fas fa-user me-2 text-muted"></i><?= htmlspecialchars($customer['contact_person'] ?? '—') ?></div>
                     </div>
@@ -122,9 +131,20 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                             <div class="row g-3">
                                 <div class="col-md-4"><strong>Mã KH:</strong> <?= htmlspecialchars($customer['customer_code'] ?? '—') ?></div>
                                 <div class="col-md-8"><strong>Tên KH:</strong> <?= htmlspecialchars($customer['customer_name']) ?></div>
-                                <div class="col-md-6"><strong>Địa chỉ:</strong> <?= htmlspecialchars($customer['address'] ?? '—') ?></div>
-                                <div class="col-md-3"><strong>SĐT:</strong> <?= htmlspecialchars($customer['phone'] ?? '—') ?></div>
-                                <div class="col-md-3"><strong>Email:</strong> <?= htmlspecialchars($customer['email'] ?? '—') ?></div>
+                                <div class="col-md-4"><strong>Mã số thuế:</strong> <?= htmlspecialchars($customer['tax_code'] ?? '—') ?></div>
+                                <div class="col-md-4"><strong>SĐT:</strong> <?= htmlspecialchars($customer['phone'] ?? '—') ?></div>
+                                <div class="col-md-4"><strong>VAT mặc định:</strong> <?= (int)($customer['vat_rate'] ?? 8) ?>%</div>
+                                <div class="col-md-12"><strong>Địa chỉ:</strong> <?= htmlspecialchars($customer['address'] ?? '—') ?></div>
+                                <div class="col-md-4"><strong>Email:</strong></div>
+                                <div class="col-md-8">
+                                    <?php if (!empty($customer['email'])): ?>
+                                        <?php foreach (explode(';', $customer['email']) as $em): $em = trim($em); if (!$em) continue; ?>
+                                        <div><a href="mailto:<?= htmlspecialchars($em) ?>"><?= htmlspecialchars($em) ?></a></div>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        —
+                                    <?php endif; ?>
+                                </div>
                                 <div class="col-md-4"><strong>Người liên hệ:</strong> <?= htmlspecialchars($customer['contact_person'] ?? '—') ?></div>
                                 <div class="col-md-4"><strong>Trạng thái:</strong>
                                     <?= !empty($customer['is_active']) ? 'Đang dùng' : 'Ngừng' ?>
@@ -275,12 +295,12 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                     <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
                     <input type="hidden" name="id" value="<?= (int)$customer['id'] ?>">
                     <div class="row g-3">
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label fw-semibold">Mã khách hàng</label>
                             <input type="text" name="customer_code" class="form-control text-uppercase" value="<?= htmlspecialchars($customer['customer_code'] ?? '') ?>">
                         </div>
-                        <div class="col-md-8">
-                            <label class="form-label fw-semibold">Tên khách hàng <span class="text-danger">*</span></label>
+                        <div class="col-md-9">
+                            <label class="form-label fw-semibold">Tên công ty <span class="text-danger">*</span></label>
                             <input type="text" name="customer_name" class="form-control" required value="<?= htmlspecialchars($customer['customer_name']) ?>">
                         </div>
                         <div class="col-12">
@@ -288,16 +308,34 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                             <input type="text" name="address" class="form-control" value="<?= htmlspecialchars($customer['address'] ?? '') ?>">
                         </div>
                         <div class="col-md-4">
+                            <label class="form-label fw-semibold">Mã số thuế</label>
+                            <input type="text" name="tax_code" class="form-control" value="<?= htmlspecialchars($customer['tax_code'] ?? '') ?>">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Thuế VAT mặc định</label>
+                            <select name="vat_rate" class="form-select">
+                                <option value="0" <?= (int)($customer['vat_rate'] ?? 8) === 0 ? 'selected' : '' ?>>0% (Không chịu thuế)</option>
+                                <option value="5" <?= (int)($customer['vat_rate'] ?? 8) === 5 ? 'selected' : '' ?>>5%</option>
+                                <option value="8" <?= (int)($customer['vat_rate'] ?? 8) === 8 ? 'selected' : '' ?>>8%</option>
+                                <option value="10" <?= (int)($customer['vat_rate'] ?? 8) === 10 ? 'selected' : '' ?>>10%</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4"></div>
+                        <div class="col-md-6">
                             <label class="form-label fw-semibold">Người liên hệ</label>
                             <input type="text" name="contact_person" class="form-control" value="<?= htmlspecialchars($customer['contact_person'] ?? '') ?>">
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Điện thoại</label>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Điện thoại <span class="text-muted small">(hiện trên biên bản giao hàng)</span></label>
                             <input type="text" name="phone" class="form-control" value="<?= htmlspecialchars($customer['phone'] ?? '') ?>">
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Email</label>
-                            <input type="email" name="email" class="form-control" value="<?= htmlspecialchars($customer['email'] ?? '') ?>">
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">
+                                Email nhận hoá đơn
+                                <span class="text-muted small">(nhiều email ngăn cách bằng dấu <code>;</code>)</span>
+                            </label>
+                            <textarea name="email" class="form-control" rows="2"><?= htmlspecialchars($customer['email'] ?? '') ?></textarea>
+                            <div class="form-text">Hệ thống sẽ gửi hoá đơn đến tất cả email này.</div>
                         </div>
                         <div class="col-12">
                             <div class="form-check form-switch">
