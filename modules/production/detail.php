@@ -21,7 +21,6 @@ $items = fetchAllSafe($pdo, "SELECT pi.*, iri.unit, pc.product_code, pc.descript
                            WHERE pi.order_id = ?
                            ORDER BY pi.id", [$id]);
 $csrf = generateCSRF();
-$badge = ['in_progress'=>'warning','done'=>'success','error'=>'danger'];
 include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/header.php';
 include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
 ?>
@@ -33,10 +32,25 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
             <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
             <input type="hidden" name="order_id" value="<?= (int)$id ?>">
             <div class="table-responsive"><table class="table table-hover align-middle">
-                <thead class="table-dark"><tr><th>Mã hàng</th><th>Tên hàng</th><th>ĐVT</th><th class="text-end">SL Tổng</th><th class="text-end text-success">SL Hoàn thành</th><th class="text-end text-danger">SL Lỗi</th><th class="text-end text-warning">SL Chưa HT</th><th>Công đoạn</th><th>Ghi chú</th><th>Trạng thái</th></tr></thead>
+                <thead class="table-dark"><tr><th><div class="form-check mb-0"><input class="form-check-input" type="checkbox" id="checkAll"><label class="form-check-label small" for="checkAll">Hoàn thành 100%</label></div></th><th>Mã hàng</th><th>Tên hàng</th><th>ĐVT</th><th class="text-end">SL Tổng</th><th class="text-end text-success">SL Hoàn thành</th><th class="text-end text-danger">SL Lỗi</th><th class="text-end text-warning">SL Chưa HT</th><th>Công đoạn</th><th>Ghi chú</th><th>Trạng thái</th></tr></thead>
                 <tbody>
-                <?php foreach($items as $idx => $it): $pending = (float)$it['qty_total'] - (float)$it['qty_done'] - (float)$it['qty_error']; ?>
+                <?php foreach($items as $idx => $it): ?>
+                    <?php
+                    $pending = max((float)$it['qty_total'] - (float)$it['qty_done'] - (float)$it['qty_error'], 0);
+                    $statusLabel = 'Đang gia công';
+                    $statusClass = 'warning';
+                    if ($pending <= 0) {
+                        if ((float)$it['qty_error'] > 0) {
+                            $statusLabel = 'Có lỗi';
+                            $statusClass = 'danger';
+                        } else {
+                            $statusLabel = 'Hoàn thành';
+                            $statusClass = 'success';
+                        }
+                    }
+                    ?>
                     <tr>
+                        <td><input type="checkbox" class="form-check-input check-done"></td>
                         <td><?= e($it['product_code']) ?><input type="hidden" name="items[<?= $idx ?>][id]" value="<?= (int)$it['id'] ?>"></td>
                         <td><?= e($it['description']) ?></td>
                         <td><?= e($it['unit']) ?></td>
@@ -46,11 +60,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                         <td class="text-end text-warning fw-semibold qty-pending"><?= e(number_format(max($pending,0),2,'.','')) ?></td>
                         <td><input type="text" class="form-control form-control-sm" name="items[<?= $idx ?>][stage]" value="<?= e($it['stage']) ?>"></td>
                         <td><input type="text" class="form-control form-control-sm" name="items[<?= $idx ?>][note]" value="<?= e($it['note']) ?>"></td>
-                        <td>
-                            <select name="items[<?= $idx ?>][status]" class="form-select form-select-sm">
-                                <?php foreach(['in_progress','done','error'] as $st): ?><option value="<?= e($st) ?>" <?= $it['status']===$st?'selected':'' ?>><?= e($st) ?></option><?php endforeach; ?>
-                            </select>
-                        </td>
+                        <td><span class="badge bg-<?= $statusClass ?> status-badge"><?= $statusLabel ?></span></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
@@ -61,22 +71,72 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
     </div></div>
 </div></div>
 <script>
+const rows = document.querySelectorAll('#formProgress tbody tr');
+const checkAll = document.getElementById('checkAll');
+const FLOAT_TOLERANCE = 0.001;
+
+function updateCheckAllState(){
+  const rowChecks = document.querySelectorAll('.check-done');
+  const checked = document.querySelectorAll('.check-done:checked');
+  checkAll.checked = rowChecks.length > 0 && checked.length === rowChecks.length;
+  checkAll.indeterminate = checked.length > 0 && checked.length < rowChecks.length;
+}
+
 function updateRowPending(tr){
   const total = Number(tr.querySelector('.qty-total').textContent || 0);
   const done = Number(tr.querySelector('.qty-done').value || 0);
   const err = Number(tr.querySelector('.qty-error').value || 0);
-  const pending = total - done - err;
+  const pending = Math.max(total - done - err, 0);
   tr.querySelector('.qty-pending').textContent = pending.toFixed(2);
+
+  const statusBadge = tr.querySelector('.status-badge');
+  let statusClass = 'warning';
+  let statusLabel = 'Đang gia công';
+  if (pending <= 0) {
+    if (err > 0) {
+      statusClass = 'danger';
+      statusLabel = 'Có lỗi';
+    } else {
+      statusClass = 'success';
+      statusLabel = 'Hoàn thành';
+    }
+  }
+  statusBadge.className = `badge bg-${statusClass} status-badge`;
+  statusBadge.textContent = statusLabel;
+
   tr.classList.toggle('table-danger', err > 0);
+  tr.querySelector('.check-done').checked = total > 0 && Math.abs(done - total) < FLOAT_TOLERANCE && Math.abs(err) < FLOAT_TOLERANCE;
+  updateCheckAllState();
 }
-document.querySelectorAll('tbody tr').forEach(tr=>{
-  tr.querySelectorAll('.qty-done,.qty-error').forEach(inp=>inp.addEventListener('input', ()=>updateRowPending(tr)));
+
+rows.forEach(tr=>{
+  const doneInput = tr.querySelector('.qty-done');
+  const errInput = tr.querySelector('.qty-error');
+  const rowCheck = tr.querySelector('.check-done');
+
+  doneInput.addEventListener('input', ()=>updateRowPending(tr));
+  errInput.addEventListener('input', ()=>updateRowPending(tr));
+  rowCheck.addEventListener('change', ()=>{
+    const total = Number(tr.querySelector('.qty-total').textContent || 0);
+    doneInput.value = rowCheck.checked ? total.toFixed(2) : '0.00';
+    errInput.value = '0.00';
+    updateRowPending(tr);
+  });
+
   updateRowPending(tr);
 });
+
+checkAll.addEventListener('change', ()=>{
+  document.querySelectorAll('.check-done').forEach(cb=>{
+    cb.checked = checkAll.checked;
+    cb.dispatchEvent(new Event('change'));
+  });
+});
+
 document.getElementById('formProgress').addEventListener('submit', async function(e){
   e.preventDefault();
   let valid = true;
-  document.querySelectorAll('tbody tr').forEach(tr=>{
+  rows.forEach(tr=>{
     const total = Number(tr.querySelector('.qty-total').textContent || 0);
     const done = Number(tr.querySelector('.qty-done').value || 0);
     const err = Number(tr.querySelector('.qty-error').value || 0);
