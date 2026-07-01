@@ -52,6 +52,7 @@ $monthLabel = date('m/Y');
 $dailyProgressTotal = (float)$dailyStats['done'] + (float)$dailyStats['error'] + (float)$dailyStats['pending'];
 $dailyProgressPercent = $dailyProgressTotal > 0 ? ((float)$dailyStats['done'] / $dailyProgressTotal) * 100 : 0;
 $dailyProgressPercentText = number_format($dailyProgressPercent, 1, ',', '.') . '%';
+$dailyProgressAriaText = number_format($dailyProgressPercent, 1, '.', '') . ' percent';
 
 $delivery7DaysRaw = fetchAllSafe($pdo, "SELECT DATE(d.delivery_date) AS day,
                                         SUM(CASE WHEN di.type='done' THEN di.qty_deliver ELSE 0 END) AS done,
@@ -160,7 +161,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                     <span>Tiến độ hôm nay: <?= e(number_format((float)$dailyStats['done'], 2, ',', '.')) ?> / <?= e(number_format($dailyProgressTotal, 2, ',', '.')) ?></span>
                     <span><?= e($dailyProgressPercentText) ?></span>
                 </div>
-                <div class="progress" role="progressbar" aria-label="Tiến độ hôm nay" aria-valuenow="<?= e((string)round($dailyProgressPercent)) ?>" aria-valuetext="<?= e($dailyProgressPercentText) ?>" aria-valuemin="0" aria-valuemax="100" style="height: 10px;">
+                <div class="progress" role="progressbar" aria-label="Tiến độ hôm nay" aria-valuenow="<?= e((string)round($dailyProgressPercent)) ?>" aria-valuetext="<?= e($dailyProgressAriaText) ?>" aria-valuemin="0" aria-valuemax="100" style="height: 10px;">
                     <div class="progress-bar bg-success" style="width: <?= e((string)min(100, max(0, $dailyProgressPercent))) ?>%"></div>
                 </div>
             </div>
@@ -250,7 +251,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
         </div>
     </div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script>
 (() => {
     const weeklyCtx = document.getElementById('weeklyDeliveryChart');
