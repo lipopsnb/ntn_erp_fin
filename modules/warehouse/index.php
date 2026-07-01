@@ -13,6 +13,9 @@ $stats = [
     'delivery_today' => (int)fetchScalarSafe($pdo, "SELECT COUNT(*) FROM oqc_deliveries WHERE delivery_date = CURDATE()", [], 0),
 ];
 
+$monthStart = date('Y-m-01');
+$monthEnd = date('Y-m-t');
+
 $dailyStats = [
     'iqc' => (int)fetchScalarSafe($pdo, "SELECT COUNT(*) FROM iqc_receipts WHERE DATE(received_date) = CURDATE()", [], 0),
     'orders' => (int)fetchScalarSafe($pdo, "SELECT COUNT(*) FROM production_orders WHERE DATE(created_at) = CURDATE()", [], 0),
@@ -33,16 +36,17 @@ $weeklyStats = [
 ];
 
 $monthlyStats = [
-    'iqc' => (int)fetchScalarSafe($pdo, "SELECT COUNT(*) FROM iqc_receipts WHERE YEAR(received_date) = YEAR(CURDATE()) AND MONTH(received_date) = MONTH(CURDATE())", [], 0),
-    'orders' => (int)fetchScalarSafe($pdo, "SELECT COUNT(*) FROM production_orders WHERE YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE())", [], 0),
-    'done' => (float)fetchScalarSafe($pdo, "SELECT COALESCE(SUM(qty_done),0) FROM production_items WHERE YEAR(updated_at) = YEAR(CURDATE()) AND MONTH(updated_at) = MONTH(CURDATE()) AND qty_done > 0", [], 0),
-    'error' => (float)fetchScalarSafe($pdo, "SELECT COALESCE(SUM(qty_error),0) FROM production_items WHERE YEAR(updated_at) = YEAR(CURDATE()) AND MONTH(updated_at) = MONTH(CURDATE()) AND qty_error > 0", [], 0),
-    'delivery_slips' => (int)fetchScalarSafe($pdo, "SELECT COUNT(*) FROM oqc_deliveries WHERE YEAR(delivery_date) = YEAR(CURDATE()) AND MONTH(delivery_date) = MONTH(CURDATE())", [], 0),
-    'delivery_qty' => (float)fetchScalarSafe($pdo, "SELECT COALESCE(SUM(di.qty_deliver),0) FROM oqc_delivery_items di JOIN oqc_deliveries d ON d.id = di.delivery_id WHERE YEAR(d.delivery_date) = YEAR(CURDATE()) AND MONTH(d.delivery_date) = MONTH(CURDATE())", [], 0),
+    'iqc' => (int)fetchScalarSafe($pdo, "SELECT COUNT(*) FROM iqc_receipts WHERE DATE(received_date) BETWEEN :monthStart AND :monthEnd", ['monthStart' => $monthStart, 'monthEnd' => $monthEnd], 0),
+    'orders' => (int)fetchScalarSafe($pdo, "SELECT COUNT(*) FROM production_orders WHERE DATE(created_at) BETWEEN :monthStart AND :monthEnd", ['monthStart' => $monthStart, 'monthEnd' => $monthEnd], 0),
+    'done' => (float)fetchScalarSafe($pdo, "SELECT COALESCE(SUM(qty_done),0) FROM production_items WHERE DATE(updated_at) BETWEEN :monthStart AND :monthEnd AND qty_done > 0", ['monthStart' => $monthStart, 'monthEnd' => $monthEnd], 0),
+    'error' => (float)fetchScalarSafe($pdo, "SELECT COALESCE(SUM(qty_error),0) FROM production_items WHERE DATE(updated_at) BETWEEN :monthStart AND :monthEnd AND qty_error > 0", ['monthStart' => $monthStart, 'monthEnd' => $monthEnd], 0),
+    'delivery_slips' => (int)fetchScalarSafe($pdo, "SELECT COUNT(*) FROM oqc_deliveries WHERE delivery_date BETWEEN :monthStart AND :monthEnd", ['monthStart' => $monthStart, 'monthEnd' => $monthEnd], 0),
+    'delivery_qty' => (float)fetchScalarSafe($pdo, "SELECT COALESCE(SUM(di.qty_deliver),0) FROM oqc_delivery_items di JOIN oqc_deliveries d ON d.id = di.delivery_id WHERE d.delivery_date BETWEEN :monthStart AND :monthEnd", ['monthStart' => $monthStart, 'monthEnd' => $monthEnd], 0),
 ];
 
-$weekStart = date('Y-m-d', strtotime('monday this week'));
-$weekEnd = date('Y-m-d', strtotime($weekStart . ' +6 days'));
+$weekDate = new DateTimeImmutable('today');
+$weekStart = $weekDate->modify('monday this week')->format('Y-m-d');
+$weekEnd = $weekDate->modify('sunday this week')->format('Y-m-d');
 $monthLabel = date('m/Y');
 
 $dailyProgressTotal = (float)$dailyStats['done'] + (float)$dailyStats['error'] + (float)$dailyStats['pending'];
@@ -78,18 +82,19 @@ for ($i = 6; $i >= 0; $i--) {
     $delivery7Error[] = $delivery7DaysMap[$day]['error'] ?? 0;
 }
 
-$monthlyCustomerDistribution = fetchAllSafe($pdo, "SELECT c.customer_name, COALESCE(SUM(di.qty_deliver),0) AS total_qty
+$monthlyCustomerDistribution = fetchAllSafe($pdo, "SELECT COALESCE(NULLIF(TRIM(c.customer_name), ''), CONCAT('KH #', c.id)) AS customer_name_display,
+                                                    COALESCE(SUM(di.qty_deliver),0) AS total_qty
                                                     FROM oqc_deliveries d
                                                     JOIN customers c ON c.id = d.customer_id
                                                     LEFT JOIN oqc_delivery_items di ON di.delivery_id = d.id
-                                                    WHERE YEAR(d.delivery_date)=YEAR(CURDATE()) AND MONTH(d.delivery_date)=MONTH(CURDATE())
-                                                    GROUP BY c.id, c.customer_name
+                                                    WHERE d.delivery_date BETWEEN :monthStart AND :monthEnd
+                                                    GROUP BY c.id, COALESCE(NULLIF(TRIM(c.customer_name), ''), CONCAT('KH #', c.id))
                                                     ORDER BY total_qty DESC
-                                                    LIMIT 6");
+                                                    LIMIT 6", ['monthStart' => $monthStart, 'monthEnd' => $monthEnd]);
 $customerLabels = [];
 $customerQty = [];
 foreach ($monthlyCustomerDistribution as $row) {
-    $customerLabels[] = (string)($row['customer_name'] ?? 'Khách hàng');
+    $customerLabels[] = (string)($row['customer_name_display'] ?? 'Khách hàng');
     $customerQty[] = (float)($row['total_qty'] ?? 0);
 }
 
@@ -154,7 +159,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                     <span>Tiến độ hôm nay: <?= e(number_format((float)$dailyStats['done'], 2, ',', '.')) ?> / <?= e(number_format($dailyProgressTotal, 2, ',', '.')) ?></span>
                     <span><?= e(number_format($dailyProgressPercent, 1, ',', '.')) ?>%</span>
                 </div>
-                <div class="progress" role="progressbar" aria-label="Tiến độ hôm nay" aria-valuenow="<?= e((string)round($dailyProgressPercent, 1)) ?>" aria-valuemin="0" aria-valuemax="100" style="height: 10px;">
+                <div class="progress" role="progressbar" aria-label="Tiến độ hôm nay" aria-valuenow="<?= e((string)round($dailyProgressPercent)) ?>" aria-valuemin="0" aria-valuemax="100" style="height: 10px;">
                     <div class="progress-bar bg-success" style="width: <?= e((string)min(100, max(0, $dailyProgressPercent))) ?>%"></div>
                 </div>
             </div>
