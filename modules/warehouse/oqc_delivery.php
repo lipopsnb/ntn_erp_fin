@@ -51,7 +51,11 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                     <thead class="table-dark"><tr><th></th><th>Lệnh SX</th><th>Mã hàng</th><th>Tên hàng</th><th>Loại</th><th class="text-end">SL tối đa</th><th class="text-end">SL giao</th></tr></thead>
                     <tbody>
                     <?php if(!$items): ?><tr><td colspan="7" class="text-center text-muted py-4">Vui lòng chọn khách hàng để tải dữ liệu</td></tr><?php endif; ?>
-                    <?php $rowIdx = 0; foreach($items as $it):
+                    <?php
+                    // Each product may yield up to 2 rows (done + error); $rowIdx tracks the
+                    // absolute row index so every items[N][...] group maps correctly in PHP.
+                    $rowIdx = 0;
+                    foreach($items as $it):
                         $availableDone = max((float)$it['qty_done'] - (float)$it['delivered_done'], 0);
                         $availableError = max((float)$it['qty_error'] - (float)$it['delivered_error'], 0);
                         if ($availableDone <= 0 && $availableError <= 0) continue;
