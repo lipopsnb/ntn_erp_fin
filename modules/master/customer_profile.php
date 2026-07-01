@@ -149,10 +149,16 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
 
                         <div class="tab-pane fade" id="tab-products">
                             <?php if (hasRole('director','accountant','manager')): ?>
-                            <div class="mb-3">
+                            <div class="mb-3 d-flex gap-2">
                                 <button class="btn btn-primary" id="btnAddPrice" data-bs-toggle="modal" data-bs-target="#modalPrice">
                                     <i class="fas fa-plus me-1"></i>+ Thêm mã SP
                                 </button>
+                                <button class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#modalImportPrices">
+                                    <i class="fas fa-file-excel me-1"></i>Import Excel
+                                </button>
+                                <a href="/erp/api/master/download_price_template.php" class="btn btn-outline-secondary" target="_blank">
+                                    <i class="fas fa-download me-1"></i>Tải file mẫu
+                                </a>
                             </div>
                             <?php endif; ?>
 
@@ -382,10 +388,63 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="modalImportPrices" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="fas fa-file-excel me-2"></i>Import mã sản phẩm từ Excel</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info py-2 small mb-3">
+                    <strong>Hướng dẫn:</strong>
+                    <ul class="mb-0 mt-1">
+                        <li>Tải file mẫu Excel, điền dữ liệu theo đúng định dạng.</li>
+                        <li>Cột bắt buộc: <strong>Mã SP</strong>, <strong>Tên SP</strong>, <strong>Đơn vị</strong>, <strong>Đơn giá</strong>, <strong>Ngày áp dụng</strong> (YYYY-MM-DD).</li>
+                        <li>Nếu mã SP đã tồn tại, hệ thống sẽ thêm giá mới (không ghi đè giá cũ).</li>
+                        <li>File hỗ trợ: .xlsx, .xls, .csv</li>
+                    </ul>
+                </div>
+                <input type="file" class="form-control mb-3" id="importFile" accept=".xlsx,.xls,.csv">
+                <div id="importPreview" class="d-none">
+                    <h6 class="mb-2">Xem trước dữ liệu (<span id="importRowCount">0</span> dòng)</h6>
+                    <div class="table-responsive" style="max-height:300px;overflow-y:auto;">
+                        <table class="table table-sm table-bordered" id="importPreviewTable">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>#</th>
+                                    <th>Mã SP</th>
+                                    <th>Tên SP</th>
+                                    <th>Đơn vị</th>
+                                    <th class="text-end">Đơn giá</th>
+                                    <th>Ngày áp dụng</th>
+                                    <th>Đến ngày</th>
+                                    <th>Ghi chú</th>
+                                    <th>Trạng thái</th>
+                                </tr>
+                            </thead>
+                            <tbody id="importPreviewBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div id="importResult" class="d-none"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button class="btn btn-success d-none" id="btnConfirmImport">
+                    <i class="fas fa-upload me-1"></i>Xác nhận Import
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 <?php endif; ?>
 
+<script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
 <script>
 const csrf = '<?= $csrf ?>';
+let importData = [];
 
 document.getElementById('btnSaveCustomer')?.addEventListener('click', () => {
     const form = document.getElementById('formCustomer');
@@ -462,6 +521,117 @@ document.querySelectorAll('.btn-delete-price').forEach(btn => {
             .then(r => r.json())
             .then(d => d.ok ? location.reload() : alert('Lỗi: ' + d.msg));
     });
+});
+
+const escapeHtml = (v) => String(v ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
+const isValidYmd = (value) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const date = new Date(`${value}T00:00:00`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+};
+
+document.getElementById('importFile')?.addEventListener('change', function(e) {
+    const file = e.target.files?.[0];
+    if (!file || typeof XLSX === 'undefined') return;
+
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+        const wb = XLSX.read(ev.target.result, { type: 'binary', cellDates: true });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, dateNF: 'yyyy-mm-dd' });
+
+        const dataRows = rows.slice(1).filter(r => r.length > 0 && r[0]);
+        importData = dataRows;
+
+        const tbody = document.getElementById('importPreviewBody');
+        tbody.innerHTML = '';
+
+        dataRows.forEach((r, i) => {
+            const productCode = String(r[0] || '').trim().toUpperCase();
+            const description = String(r[1] || '').trim();
+            const unit = String(r[2] || '').trim() || 'cái';
+            const unitPriceRaw = String(r[3] || '').trim();
+            const unitPrice = parseFloat(unitPriceRaw.replace(/[^0-9.-]/g, '')) || 0;
+            const effectiveDate = String(r[4] || '').trim();
+            const expiredDate = String(r[5] || '').trim();
+            const note = String(r[6] || '').trim();
+
+            const hasRequired = !!(productCode && description && unit && unitPriceRaw && effectiveDate);
+            const dateValid = isValidYmd(effectiveDate);
+            const expiredValid = !expiredDate || isValidYmd(expiredDate);
+            let status = '✅ Hợp lệ';
+            let rowClass = '';
+            if (!hasRequired || !dateValid || !expiredValid) {
+                status = '❌ Thiếu dữ liệu / sai định dạng';
+                rowClass = 'table-danger';
+            }
+
+            tbody.innerHTML += `<tr class="${rowClass}">
+                <td>${i + 1}</td>
+                <td><strong>${escapeHtml(productCode)}</strong></td>
+                <td>${escapeHtml(description)}</td>
+                <td>${escapeHtml(unit)}</td>
+                <td class="text-end">${unitPrice.toLocaleString('vi-VN')}</td>
+                <td>${escapeHtml(effectiveDate)}</td>
+                <td>${escapeHtml(expiredDate || '—')}</td>
+                <td>${escapeHtml(note)}</td>
+                <td>${status}</td>
+            </tr>`;
+        });
+
+        document.getElementById('importRowCount').textContent = dataRows.length;
+        document.getElementById('importPreview').classList.remove('d-none');
+        document.getElementById('btnConfirmImport').classList.remove('d-none');
+        document.getElementById('importResult').classList.add('d-none');
+    };
+    reader.readAsBinaryString(file);
+});
+
+document.getElementById('btnConfirmImport')?.addEventListener('click', async function() {
+    if (!importData.length) return;
+
+    const btn = this;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Đang import...';
+
+    const fd = new FormData();
+    fd.append('csrf_token', csrf);
+    fd.append('customer_id', '<?= (int)$customer['id'] ?>');
+    fd.append('rows', JSON.stringify(importData));
+
+    try {
+        const res = await fetch('/erp/api/master/import_customer_prices.php', { method: 'POST', body: fd });
+        const data = await res.json();
+
+        const resultDiv = document.getElementById('importResult');
+        resultDiv.classList.remove('d-none');
+
+        if (data.ok) {
+            resultDiv.innerHTML = `<div class="alert alert-success">✅ Import thành công: <strong>${data.imported}</strong> dòng.${data.skipped > 0 ? ` Bỏ qua: ${data.skipped} dòng lỗi.` : ''}</div>`;
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            resultDiv.innerHTML = `<div class="alert alert-danger">❌ Lỗi: ${escapeHtml(data.msg || 'Không xác định')}</div>`;
+        }
+    } catch (err) {
+        alert('Lỗi kết nối: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-upload me-1"></i>Xác nhận Import';
+    }
+});
+
+document.getElementById('modalImportPrices')?.addEventListener('hidden.bs.modal', function() {
+    document.getElementById('importFile').value = '';
+    document.getElementById('importPreview').classList.add('d-none');
+    document.getElementById('importResult').classList.add('d-none');
+    document.getElementById('btnConfirmImport').classList.add('d-none');
+    importData = [];
 });
 </script>
 
