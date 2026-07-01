@@ -19,7 +19,7 @@ $docTypeMap = [
     'maintenance' => 'Bảo dưỡng',
 ];
 $filterStatus = trim($_GET['status'] ?? '');
-$selectedTab = in_array($_GET['tab'] ?? 'info', ['info', 'documents', 'fuel', 'trips'], true) ? (string)$_GET['tab'] : 'info';
+$selectedTab = in_array($_GET['tab'] ?? '', ['info', 'documents', 'fuel', 'trips'], true) ? (string)$_GET['tab'] : 'info';
 $selectedVehicleId = (int)($_GET['id'] ?? 0);
 
 $vehiclesPageUrl = static function (array $overrides = []) use ($filterStatus, $selectedTab, $selectedVehicleId): string {
