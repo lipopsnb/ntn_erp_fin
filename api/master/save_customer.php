@@ -31,7 +31,7 @@ if (!in_array($vatRate, [0, 5, 8, 10], true)) {
 }
 
 if ($email) {
-    $emailList = array_filter(array_map('trim', explode(';', $email)));
+    $emailList = array_filter(array_map('trim', explode(';', $email)), static fn($emailItem) => $emailItem !== '');
     $email     = implode('; ', $emailList) ?: null;
 } else {
     $email = null;
