@@ -115,6 +115,9 @@ elseif (isGroupActive(['/modules/users/index'])) $activeGroup = 'system';
       </ul>
     </li>
 
+    <!-- Các module sau chỉ hiển thị với role không phải employee -->
+    <?php if (!hasRole('employee')): ?>
+
     <!-- DANH MỤC -->
     <?php if (hasRole('director','accountant','warehouse','production','manager')): ?>
     <li class="nav-item">
@@ -182,7 +185,7 @@ elseif (isGroupActive(['/modules/users/index'])) $activeGroup = 'system';
     <?php endif; ?>
 
     <!-- HÀNH CHÍNH -->
-    <?php if (hasRole('director','accountant','manager','warehouse','production','employee')): ?>
+    <?php if (hasRole('director','accountant','manager','warehouse','production')): ?>
     <li class="nav-item">
       <a class="nav-link sidebar-group-toggle" href="#" data-target="grp-admin">
         <i class="fas fa-building"></i><span>Hành chính</span>
@@ -255,6 +258,8 @@ elseif (isGroupActive(['/modules/users/index'])) $activeGroup = 'system';
       </ul>
     </li>
     <?php endif; ?>
+
+    <?php endif; // !hasRole('employee') ?>
 
   </ul>
 </div>
