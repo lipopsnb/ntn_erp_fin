@@ -105,6 +105,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
 <script>
 const productCodes = <?= json_encode($productCodes, JSON_UNESCAPED_UNICODE) ?>;
 const createModal = new bootstrap.Modal(document.getElementById('modalCreateIqc'));
+const escHtml = (val) => String(val ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 
 function productOptions(customerId, selected){
   return productCodes.map(pc => {
@@ -112,7 +113,7 @@ function productOptions(customerId, selected){
     const visible = !customerId || ids.length === 0 || ids.includes(String(customerId));
     if(!visible) return '';
     const sel = String(selected||'')===String(pc.id) ? 'selected' : '';
-    return `<option value="${pc.id}" data-unit="${pc.unit||'cái'}" ${sel}>${pc.product_code} - ${pc.description}</option>`;
+    return `<option value="${escHtml(pc.id)}" data-unit="${escHtml(pc.unit||'cái')}" ${sel}>${escHtml(pc.product_code)} - ${escHtml(pc.description)}</option>`;
   }).join('');
 }
 function addItemRow(){
@@ -160,7 +161,7 @@ document.querySelectorAll('.btn-view-items').forEach(btn=>btn.addEventListener('
   const res = await fetch('/erp/api/warehouse/get_iqc_items.php?receipt_id='+this.dataset.id);
   const data = await res.json();
   if(data.ok && data.items.length){
-    body.innerHTML = data.items.map(it=>`<tr><td>${it.product_code||''}</td><td>${it.description||''}</td><td class="text-end">${Number(it.qty).toLocaleString('vi-VN')}</td><td>${it.unit||''}</td></tr>`).join('');
+    body.innerHTML = data.items.map(it=>`<tr><td>${escHtml(it.product_code)}</td><td>${escHtml(it.description)}</td><td class="text-end">${Number(it.qty).toLocaleString('vi-VN')}</td><td>${escHtml(it.unit)}</td></tr>`).join('');
   }else{
     body.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Không có dữ liệu</td></tr>';
   }
