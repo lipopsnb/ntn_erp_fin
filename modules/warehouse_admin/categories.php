@@ -27,8 +27,41 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
 </div><div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal" type="button">Đóng</button><button class="btn btn-primary" type="submit">Lưu</button></div></form></div></div></div>
 <script>
 const modal = new bootstrap.Modal(document.getElementById('modalCategory'));
-document.getElementById('btnNew').addEventListener('click', ()=>{ catId.value=''; catName.value=''; catDescription.value=''; catActive.value='1'; modal.show(); });
-document.querySelectorAll('.btn-edit').forEach(btn=>btn.addEventListener('click', function(){ catId.value=this.dataset.id; catName.value=this.dataset.name; catDescription.value=this.dataset.description; catActive.value=this.dataset.active; modal.show(); }));
-document.getElementById('formCategory').addEventListener('submit', async function(e){ e.preventDefault(); const res=await fetch('/erp/api/warehouse_admin/save_category.php',{method:'POST',body:new FormData(this)}); const data=await res.json(); if(data.ok) location.reload(); else alert(data.msg||'Lỗi lưu dữ liệu'); });
+const catId = document.getElementById('catId');
+const catName = document.getElementById('catName');
+const catDescription = document.getElementById('catDescription');
+const catActive = document.getElementById('catActive');
+
+document.getElementById('btnNew').addEventListener('click', () => {
+    catId.value = '';
+    catName.value = '';
+    catDescription.value = '';
+    catActive.value = '1';
+    modal.show();
+});
+
+document.querySelectorAll('.btn-edit').forEach(btn => btn.addEventListener('click', function() {
+    catId.value = this.dataset.id;
+    catName.value = this.dataset.name;
+    catDescription.value = this.dataset.description || '';
+    catActive.value = this.dataset.active !== undefined ? this.dataset.active : '1';
+    modal.show();
+}));
+
+document.getElementById('formCategory').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    try {
+        const res = await fetch('/erp/api/warehouse_admin/save_category.php', {method: 'POST', body: new FormData(this)});
+        if (!res.ok) {
+            alert('Lỗi server (HTTP ' + res.status + '). Vui lòng tải lại trang và thử lại.');
+            return;
+        }
+        const data = await res.json();
+        if (data.ok) location.reload();
+        else alert(data.msg || 'Lỗi lưu nhóm vật tư');
+    } catch (err) {
+        alert('Không thể kết nối server. Vui lòng tải lại trang và thử lại.');
+    }
+});
 </script>
 <?php include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/footer.php'; ?>

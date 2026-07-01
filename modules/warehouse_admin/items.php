@@ -50,8 +50,51 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
 </div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button><button class="btn btn-primary" type="submit">Lưu</button></div></form></div></div></div>
 <script>
 const itemModal = new bootstrap.Modal(document.getElementById('modalItem'));
-document.getElementById('btnNewItem').addEventListener('click', ()=>{ itemId.value=''; itemCode.value=''; itemName.value=''; itemUnit.value='cái'; itemMinStock.value='0'; itemActive.value='1'; itemModal.show(); });
-document.querySelectorAll('.btn-edit-item').forEach(btn=>btn.addEventListener('click', ()=>{ const d=JSON.parse(btn.dataset.json); itemId.value=d.id||''; itemCode.value=d.item_code||''; itemName.value=d.item_name||''; itemCategory.value=d.category_id||''; itemUnit.value=d.unit||'cái'; itemMinStock.value=d.min_stock||'0'; itemActive.value=d.is_active||1; itemModal.show(); }));
-document.getElementById('formItem').addEventListener('submit', async function(e){ e.preventDefault(); const res=await fetch('/erp/api/warehouse_admin/save_item.php',{method:'POST', body:new FormData(this)}); const data=await res.json(); if(data.ok) location.reload(); else alert(data.msg||'Lỗi lưu vật tư'); });
+const itemId = document.getElementById('itemId');
+const itemCode = document.getElementById('itemCode');
+const itemName = document.getElementById('itemName');
+const itemCategory = document.getElementById('itemCategory');
+const itemUnit = document.getElementById('itemUnit');
+const itemMinStock = document.getElementById('itemMinStock');
+const itemActive = document.getElementById('itemActive');
+
+document.getElementById('btnNewItem').addEventListener('click', () => {
+    itemId.value = '';
+    itemCode.value = '';
+    itemName.value = '';
+    itemCategory.value = '';
+    itemUnit.value = 'cái';
+    itemMinStock.value = '0';
+    itemActive.value = '1';
+    itemModal.show();
+});
+
+document.querySelectorAll('.btn-edit-item').forEach(btn => btn.addEventListener('click', () => {
+    const d = JSON.parse(btn.dataset.json);
+    itemId.value = d.id || '';
+    itemCode.value = d.item_code || '';
+    itemName.value = d.item_name || '';
+    itemCategory.value = d.category_id || '';
+    itemUnit.value = d.unit || 'cái';
+    itemMinStock.value = d.min_stock || '0';
+    itemActive.value = d.is_active !== undefined ? d.is_active : 1;
+    itemModal.show();
+}));
+
+document.getElementById('formItem').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    try {
+        const res = await fetch('/erp/api/warehouse_admin/save_item.php', {method: 'POST', body: new FormData(this)});
+        if (!res.ok) {
+            alert('Lỗi server (HTTP ' + res.status + '). Vui lòng tải lại trang và thử lại.');
+            return;
+        }
+        const data = await res.json();
+        if (data.ok) location.reload();
+        else alert(data.msg || 'Lỗi lưu vật tư');
+    } catch (err) {
+        alert('Không thể kết nối server. Vui lòng tải lại trang và thử lại.');
+    }
+});
 </script>
 <?php include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/footer.php'; ?>
