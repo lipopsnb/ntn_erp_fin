@@ -48,32 +48,48 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
             <h6>Danh sách hàng có thể giao</h6>
             <div class="table-responsive">
                 <table class="table table-sm align-middle">
-                    <thead class="table-dark"><tr><th></th><th>Lệnh SX</th><th>Mã hàng</th><th>Tên hàng</th><th class="text-end text-success">SL HT</th><th class="text-end text-danger">SL Lỗi</th><th>Loại</th><th class="text-end">SL giao</th></tr></thead>
+                    <thead class="table-dark"><tr><th></th><th>Lệnh SX</th><th>Mã hàng</th><th>Tên hàng</th><th>Loại</th><th class="text-end">SL tối đa</th><th class="text-end">SL giao</th></tr></thead>
                     <tbody>
-                    <?php if(!$items): ?><tr><td colspan="8" class="text-center text-muted py-4">Vui lòng chọn khách hàng để tải dữ liệu</td></tr><?php endif; ?>
-                    <?php foreach($items as $it):
+                    <?php if(!$items): ?><tr><td colspan="7" class="text-center text-muted py-4">Vui lòng chọn khách hàng để tải dữ liệu</td></tr><?php endif; ?>
+                    <?php
+                    // Each product may yield up to 2 rows (done + error); $rowIdx tracks the
+                    // absolute row index so every items[N][...] group maps correctly in PHP.
+                    $rowIdx = 0;
+                    foreach($items as $it):
                         $availableDone = max((float)$it['qty_done'] - (float)$it['delivered_done'], 0);
                         $availableError = max((float)$it['qty_error'] - (float)$it['delivered_error'], 0);
                         if ($availableDone <= 0 && $availableError <= 0) continue;
                     ?>
+                    <?php if ($availableDone > 0): ?>
                     <tr>
                         <td><input class="form-check-input pick-row" type="checkbox"></td>
                         <td><?= e($it['order_no']) ?></td>
                         <td><?= e($it['product_code']) ?></td>
                         <td><?= e($it['description']) ?></td>
+                        <td><span class="badge bg-success">Thành phẩm</span></td>
                         <td class="text-end text-success"><?= e(number_format($availableDone,2,',','.')) ?></td>
-                        <td class="text-end text-danger"><?= e(number_format($availableError,2,',','.')) ?></td>
-                        <td>
-                            <select class="form-select form-select-sm row-type" name="items[][type]">
-                                <?php if($availableDone>0): ?><option value="done">Thành phẩm</option><?php endif; ?>
-                                <?php if($availableError>0): ?><option value="error">Lỗi-Trả lại</option><?php endif; ?>
-                            </select>
-                        </td>
                         <td class="text-end">
-                            <input type="hidden" name="items[][production_item_id]" value="<?= (int)$it['id'] ?>">
-                            <input type="number" step="0.01" min="0" class="form-control form-control-sm row-qty" name="items[][qty_deliver]" value="0">
+                            <input type="hidden" name="items[<?= $rowIdx ?>][production_item_id]" value="<?= (int)$it['id'] ?>">
+                            <input type="hidden" name="items[<?= $rowIdx ?>][type]" value="done">
+                            <input type="number" step="0.01" min="0" class="form-control form-control-sm row-qty" name="items[<?= $rowIdx ?>][qty_deliver]" value="0">
                         </td>
                     </tr>
+                    <?php $rowIdx++; endif; ?>
+                    <?php if ($availableError > 0): ?>
+                    <tr class="table-danger bg-opacity-25">
+                        <td><input class="form-check-input pick-row" type="checkbox"></td>
+                        <td><?= e($it['order_no']) ?></td>
+                        <td><?= e($it['product_code']) ?></td>
+                        <td><?= e($it['description']) ?></td>
+                        <td><span class="badge bg-danger">Lỗi-Trả lại</span></td>
+                        <td class="text-end text-danger"><?= e(number_format($availableError,2,',','.')) ?></td>
+                        <td class="text-end">
+                            <input type="hidden" name="items[<?= $rowIdx ?>][production_item_id]" value="<?= (int)$it['id'] ?>">
+                            <input type="hidden" name="items[<?= $rowIdx ?>][type]" value="error">
+                            <input type="number" step="0.01" min="0" class="form-control form-control-sm row-qty" name="items[<?= $rowIdx ?>][qty_deliver]" value="0">
+                        </td>
+                    </tr>
+                    <?php $rowIdx++; endif; ?>
                     <?php endforeach; ?>
                     </tbody>
                 </table>

@@ -23,10 +23,17 @@ $items = fetchAllSafe($pdo, "SELECT di.*, pi.qty_total, pi.qty_done, pi.qty_erro
                            JOIN production_items pi ON di.production_item_id = pi.id
                            JOIN iqc_receipt_items iri ON pi.iqc_item_id = iri.id
                            JOIN product_codes pc ON iri.product_code_id = pc.id
-                           WHERE di.delivery_id = ?", [$id]);
+                           WHERE di.delivery_id = ?
+                           ORDER BY pc.product_code, FIELD(di.type, 'done', 'error')", [$id]);
 
 $totalQty = 0;
-foreach ($items as $it) { $totalQty += (float)$it['qty_deliver']; }
+$totalDone = 0;
+$totalError = 0;
+foreach ($items as $it) {
+    $qty = (float)$it['qty_deliver'];
+    $totalQty += $qty;
+    if ($it['type'] === 'done') { $totalDone += $qty; } else { $totalError += $qty; }
+}
 ?>
 <!doctype html>
 <html lang="vi"><head><meta charset="utf-8"><title>Biên bản giao hàng</title>
@@ -69,7 +76,15 @@ body{font-family:DejaVu Sans,Arial,sans-serif;color:#222;font-size:14px}.wrap{ma
             </tr>
         <?php endforeach; ?>
         </tbody>
-        <tfoot><tr><th colspan="4" class="text-end">Tổng số lượng</th><th class="text-end"><?= e(number_format($totalQty, 2, ',', '.')) ?></th><th colspan="2"></th></tr></tfoot>
+        <tfoot>
+            <?php if ($totalDone > 0): ?>
+            <tr><th colspan="4" class="text-end type-done">Tổng hoàn thành</th><th class="text-end type-done"><?= e(number_format($totalDone, 2, ',', '.')) ?></th><th colspan="2"></th></tr>
+            <?php endif; ?>
+            <?php if ($totalError > 0): ?>
+            <tr><th colspan="4" class="text-end type-error">Tổng lỗi-trả lại</th><th class="text-end type-error"><?= e(number_format($totalError, 2, ',', '.')) ?></th><th colspan="2"></th></tr>
+            <?php endif; ?>
+            <tr><th colspan="4" class="text-end">Tổng số lượng</th><th class="text-end"><?= e(number_format($totalQty, 2, ',', '.')) ?></th><th colspan="2"></th></tr>
+        </tfoot>
     </table>
 
     <div class="sign">
