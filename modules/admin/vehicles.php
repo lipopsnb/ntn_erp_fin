@@ -363,7 +363,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                                                 <?= csrfInput() ?>
                                                 <input type="hidden" name="action" value="delete">
                                                 <input type="hidden" name="id" value="<?= (int)$vehicle['id'] ?>">
-                                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Xoá phương tiện này?');">Xóa</button>
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); return confirm('Xoá phương tiện này?');">Xóa</button>
                                             </form>
                                         <?php endif; ?>
                                     </div>
