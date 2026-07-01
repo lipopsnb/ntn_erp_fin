@@ -108,6 +108,11 @@ const escHtml = (val) => String(val ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;
 let cachedCustomerId = null;
 let cachedProducts = [];
 
+function clearProductCache() {
+  cachedCustomerId = null;
+  cachedProducts = [];
+}
+
 function buildProductOptions(products, selectedId = '') {
   if (!products.length) {
     return '<option value="">-- Chưa có sản phẩm --</option>';
@@ -121,13 +126,19 @@ function buildProductOptions(products, selectedId = '') {
 async function fetchProducts(customerId) {
   if (!customerId) return [];
   if (String(customerId) === String(cachedCustomerId)) return cachedProducts;
-  const res = await fetch(`/erp/api/warehouse/get_customer_products.php?customer_id=${encodeURIComponent(customerId)}`);
-  const data = await res.json();
-  if (data.ok) {
-    cachedCustomerId = customerId;
-    cachedProducts = data.products || [];
+  try {
+    const res = await fetch(`/erp/api/warehouse/get_customer_products.php?customer_id=${encodeURIComponent(customerId)}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (data.ok) {
+      cachedCustomerId = customerId;
+      cachedProducts = data.products || [];
+    }
+    return data.products || [];
+  } catch (err) {
+    console.error('Không tải được danh sách sản phẩm theo khách hàng:', err);
+    return [];
   }
-  return data.products || [];
 }
 
 async function rebuildAllProductSelects(customerId) {
@@ -190,8 +201,7 @@ document.querySelector('#iqcItemsTable tbody').addEventListener('change', functi
 document.getElementById('modalCreateIqc').addEventListener('hidden.bs.modal', function () {
   document.querySelector('#iqcItemsTable tbody').innerHTML = '';
   document.getElementById('formCreateIqc').reset();
-  cachedCustomerId = null;
-  cachedProducts = [];
+  clearProductCache();
 });
 
 document.getElementById('formCreateIqc').addEventListener('submit', async function (e) {
