@@ -22,7 +22,7 @@ if (!hasRole('director', 'accountant', 'manager') && $targetId !== (int)$current
 $isAdmin      = hasRole('director', 'accountant');
 $isOwnProfile = ($targetId === (int)$currentUser['id']);
 
-$canEdit       = $isAdmin || $isOwnProfile;   // Nhân viên được sửa profile của mình
+$canEdit       = $isAdmin;                    // Chỉ GĐ/KT mới sửa hồ sơ
 $canEditSalary = $isAdmin;                    // Chỉ GĐ/KT mới sửa bảng lương
 $canViewSalary = $isAdmin || $isOwnProfile;   // Xem lương: GĐ/KT hoặc chính mình
 

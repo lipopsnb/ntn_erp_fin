@@ -7,7 +7,7 @@ requireRole('director', 'accountant', 'manager');
 
 $pdo = getDBConnection();
 $user = currentUser();
-$canApprove = hasRole('director', 'accountant');
+$canApprove = hasRole('director');
 $canViewHistory = hasRole('director', 'accountant', 'manager');
 $canRecordPayment = hasRole('director', 'accountant', 'manager');
 $errors = [];
