@@ -4,17 +4,11 @@
  * Port từ EHoaDonClient.php đã hoạt động, adapted cho NTN ERP.
  *
  * TaxRateID:
- *   1 = 0%
- *   2 = 5%
- *   3 = 10%
- *   4 = KCT (không chịu thuế)
- *   5 = KKT (không kê khai)
- *   6 = Khác
- *   9 = 8%
+ *   1 = 0%    2 = 5%    3 = 10%
+ *   4 = KCT   5 = KKT   6 = Khác   9 = 8%
  *
  * ItemTypeID:
- *   0 = HangHoa  (có STT)
- *   4 = GhiChu   (không STT)
+ *   0 = HangHoa (có STT)   4 = GhiChu (không STT)
  */
 class BkavEHoaDonClient
 {
@@ -27,28 +21,27 @@ class BkavEHoaDonClient
     private const ITEM_GHI_CHU  = 4;
 
     private const TAX_RATE_MAP = [
-        0  => 1,  // 0%
-        5  => 2,  // 5%
-        8  => 9,  // 8%
-        10 => 3,  // 10%
+        0  => 1,
+        5  => 2,
+        8  => 9,
+        10 => 3,
     ];
 
     private const PAY_METHOD_MAP = [
-        'TM'    => 1,
-        'CK'    => 2,
-        'TM/CK' => 3,
-        'CHUYENKOAN' => 2,
+        'TM'         => 1,
+        'CK'         => 2,
+        'TM/CK'      => 3,
+        'CHUYENKHOAN'=> 2,
     ];
 
     public function __construct()
     {
-        $this->wsUrl       = defined('BKAV_ENV') && BKAV_ENV === 'production'
+        $this->wsUrl = defined('BKAV_ENV') && BKAV_ENV === 'production'
             ? 'https://ws.ehoadon.vn/WSPublicEhoadon.asmx'
             : 'https://wsdemo.ehoadon.vn/WSPublicEhoadon.asmx';
 
         $this->partnerGuid = BKAV_PARTNER_GUID;
 
-        // PartnerToken = Base64Key:Base64IV
         $aesKey = base64_decode(BKAV_AES_KEY);
         $aesIv  = base64_decode(BKAV_AES_IV);
 
@@ -105,7 +98,7 @@ class BkavEHoaDonClient
         array  $inv,
         array  $items,
         int    $invoiceId,
-        string $invoiceDate  = '',
+        string $invoiceDate   = '',
         string $paymentMethod = 'Chuyển khoản',
         string $note          = ''
     ): array {
@@ -113,11 +106,17 @@ class BkavEHoaDonClient
             $invoiceDate = $inv['invoice_date'] ?? date('Y-m-d');
         }
 
-        $vatRate  = (float)($inv['vat_rate'] ?? 0);
-        $vatPct   = (int)round($vatRate);
-        $taxRateId = self::TAX_RATE_MAP[$vatPct] ?? 9; // default 8%
+        // Validate bắt buộc
+        if (empty(trim($inv['tax_code'] ?? ''))) {
+            throw new RuntimeException('Khách hàng chưa có Mã số thuế (BuyerTaxCode). Vui lòng cập nhật trước khi xuất VAT.');
+        }
 
-        $payMethodId = self::PAY_METHOD_MAP[strtoupper(trim($paymentMethod))] ?? 3;
+        $vatRate   = (float)($inv['vat_rate'] ?? 0);
+        $vatPct    = (int)round($vatRate);
+        $taxRateId = self::TAX_RATE_MAP[$vatPct] ?? 9;
+
+        $payKey      = strtoupper(preg_replace('/\s+/', '', trim($paymentMethod)));
+        $payMethodId = self::PAY_METHOD_MAP[$payKey] ?? 3;
 
         // Dòng ghi chú đầu HĐ
         $lineItems = [];
@@ -184,21 +183,16 @@ class BkavEHoaDonClient
     }
 
     // ──────────────────────────────────────────────────────────────
-    // isSuccess: ưu tiên GUID hợp lệ
+    // isSuccess
     // ──────────────────────────────────────────────────────────────
 
     public function isSuccess(array $result): bool
     {
         if (empty($result)) return false;
         if (!empty($result['_wrapper_isErr'])) return false;
-
         $guid = $result['InvoiceGUID'] ?? '';
-        if (!empty($guid) && $guid !== '00000000-0000-0000-0000-000000000000') {
-            return true;
-        }
-        if (array_key_exists('Status', $result)) {
-            return intval($result['Status']) === 0;
-        }
+        if (!empty($guid) && $guid !== '00000000-0000-0000-0000-000000000000') return true;
+        if (array_key_exists('Status', $result)) return intval($result['Status']) === 0;
         return false;
     }
 
@@ -226,7 +220,7 @@ class BkavEHoaDonClient
             'Qty'               => 0,
             'Price'             => 0,
             'Amount'            => 0,
-            'TaxRateID'         => 5, // KKT
+            'TaxRateID'         => 5,
             'TaxAmount'         => 0,
             'IsDiscount'        => false,
             'UserDefineDetails' => '',
@@ -299,7 +293,6 @@ class BkavEHoaDonClient
 
     private function parseResponse(string $soapResponse): array
     {
-        // Tìm ExecCommandResult
         if (!preg_match('/<ExecCommandResult[^>]*>(.*?)<\/ExecCommandResult>/s', $soapResponse, $m)) {
             if (preg_match('/<faultstring>(.*?)<\/faultstring>/s', $soapResponse, $f)) {
                 throw new RuntimeException('SOAP Fault: ' . strip_tags($f[1]));
@@ -309,8 +302,16 @@ class BkavEHoaDonClient
 
         $resultText = html_entity_decode(trim($m[1]), ENT_QUOTES | ENT_XML1, 'UTF-8');
 
+        // ── Pattern lỗi plain-text từ BKAV: "[!|...|!]" hoặc "[MessageForUser]" ──
         if (str_starts_with($resultText, '[MessageForUser]')) {
-            throw new RuntimeException('eHoaDon: ' . trim(str_replace('[MessageForUser]', '', $resultText)));
+            $msg = trim(str_replace('[MessageForUser]', '', $resultText));
+            throw new RuntimeException('eHoaDon: ' . $msg);
+        }
+        if (preg_match('/\[!|.*?|!\]/u', $resultText) || str_contains($resultText, 'Có lỗi xảy ra')) {
+            // Xoá ký hiệu debug của BKAV, giữ phần text đọc được
+            $cleanMsg = preg_replace('/\s*\[!?\|[^\]]*\|?!\]\s*/u', '', $resultText);
+            $cleanMsg = preg_replace('/\s*\[#\d+\]\s*/u', '', $cleanMsg);
+            throw new RuntimeException('BKAV server lỗi: ' . trim($cleanMsg ?: $resultText));
         }
         if (empty($resultText)) {
             throw new RuntimeException('eHoaDon trả về response rỗng.');
@@ -322,19 +323,18 @@ class BkavEHoaDonClient
             if ($decoded !== null) return $decoded;
         }
 
-        // Base64 decode
+        // Base64 → AES → gzip → JSON
         $decoded = base64_decode($resultText, true);
         if ($decoded === false) {
-            throw new RuntimeException('base64_decode thất bại. ResultRaw(200): ' . substr($resultText, 0, 200));
+            // Không phải base64 → có thể là plain-text error khác
+            throw new RuntimeException('BKAV trả lỗi: ' . substr($resultText, 0, 300));
         }
 
-        // AES decrypt
         $decrypted = openssl_decrypt($decoded, 'AES-256-CBC', $this->aesKey, OPENSSL_RAW_DATA, $this->aesIv);
         if ($decrypted === false) {
             throw new RuntimeException('Giải mã AES thất bại. Kiểm tra BKAV_AES_KEY và BKAV_AES_IV.');
         }
 
-        // gzip decode
         $final = @gzdecode($decrypted);
         if ($final === false) $final = $decrypted;
 
@@ -378,9 +378,9 @@ class BkavEHoaDonClient
             return array_merge($raw, ['_object_raw' => $obj, '_unwrap_failed' => true]);
         }
 
-        $item['_wrapper_status'] = $raw['Status']   ?? null;
-        $item['_wrapper_isOk']   = $raw['isOk']     ?? null;
-        $item['_wrapper_isErr']  = $raw['isError']  ?? null;
+        $item['_wrapper_status'] = $raw['Status']  ?? null;
+        $item['_wrapper_isOk']   = $raw['isOk']    ?? null;
+        $item['_wrapper_isErr']  = $raw['isError'] ?? null;
         return $item;
     }
 }
