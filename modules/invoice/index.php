@@ -27,6 +27,7 @@ if (empty($where)) { $where[] = '1=1'; }
 
 $invoices = $pdo->prepare("
     SELECT i.*,
+           i.bkav_invoice_no,
            c.customer_name, c.customer_code,
            u.full_name AS created_by_name,
            COALESCE(SUM(p.amount),0) AS paid_amount
@@ -193,10 +194,17 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                                 <?= $inv['due_date'] ? date('d/m/Y', strtotime($inv['due_date'])) : '—' ?>
                             </td>
                             <td>
-                                <button class="btn btn-sm btn-outline-warning btn-vat-placeholder"
-                                        title="Xuất hóa đơn VAT (đang hoàn thiện)"
+                                <button class="btn btn-sm btn-outline-warning btn-vat"
+                                        data-id="<?= $inv['id'] ?>"
+                                        data-no="<?= htmlspecialchars($inv['invoice_no']) ?>"
+                                        data-bkav="<?= htmlspecialchars($inv['bkav_invoice_no'] ?? '') ?>"
+                                        title="Xuất hoá đơn VAT BKAV"
                                         onclick="event.stopPropagation()">
-                                    <i class="fas fa-file-invoice-dollar"></i>
+                                    <?php if (!empty($inv['bkav_invoice_no'])): ?>
+                                        <i class="fas fa-check-circle text-success"></i>
+                                    <?php else: ?>
+                                        <i class="fas fa-file-invoice-dollar"></i>
+                                    <?php endif; ?>
                                 </button>
                                 <?php if ($inv['status'] !== 'paid' && $inv['status'] !== 'cancelled' && $inv['status'] !== 'draft'): ?>
                                 <button class="btn btn-sm btn-outline-success btn-pay"
@@ -671,13 +679,84 @@ document.querySelectorAll('.btn-pay').forEach(btn => {
     });
 });
 
-// ── Xuất VAT (placeholder) ──
-document.querySelectorAll('.btn-vat-placeholder').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+// ── Xuất VAT ──
+document.querySelectorAll('.btn-vat').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        alert('Tính năng xuất hóa đơn VAT đang được hoàn thiện. Vui lòng trở lại sau!');
+        const invId  = btn.dataset.id;
+        const bkavNo = btn.dataset.bkav;
+        if (bkavNo) {
+            if (!confirm(`Hoá đơn này đã xuất BKAV: ${bkavNo}\nXuất lại?`)) return;
+        }
+        try {
+            const res = await fetch(`/erp/api/invoice/push_invoice.php?preview=1&invoice_id=${invId}`).then(r => r.json());
+            if (!res.success) { alert('Lỗi: ' + res.message); return; }
+            renderVatPreview(res.preview, invId);
+            new bootstrap.Modal(document.getElementById('modalVAT')).show();
+        } catch (err) {
+            alert('Lỗi kết nối khi tải preview.');
+        }
     });
 });
+
+function renderVatPreview(p, invId) {
+    document.getElementById('vatInvoiceNo').textContent     = p.invoice_no || '';
+    document.getElementById('vatInvoiceDate').textContent   = fmtDate(p.invoice_date);
+    document.getElementById('vatSellerName').textContent    = p.seller_name || '';
+    document.getElementById('vatSellerTax').textContent     = p.seller_tax  || '';
+    document.getElementById('vatSellerAddress').textContent = p.seller_address || '';
+    document.getElementById('vatBuyerName').textContent     = p.contact_person || p.customer_name || '';
+    document.getElementById('vatBuyerUnit').textContent     = p.customer_name  || '';
+    document.getElementById('vatBuyerAddress').textContent  = p.address     || '';
+    document.getElementById('vatBuyerTax').textContent      = p.tax_code    || '';
+    document.getElementById('vatBuyerBank').textContent     = p.bank_account ? `${p.bank_account} – ${p.bank_name}` : '';
+
+    let rowsHtml = '';
+    (p.items || []).forEach((it, i) => {
+        rowsHtml += `<tr>
+            <td>${i + 1}</td>
+            <td>${esc(it.description)}</td>
+            <td class="text-center">${esc(it.unit)}</td>
+            <td class="text-end">${fmtNum(it.quantity)}</td>
+            <td class="text-end">${fmtMoney(it.unit_price)}</td>
+            <td class="text-end fw-bold">${fmtMoney(it.total_price)}</td>
+        </tr>`;
+    });
+    document.getElementById('vatItemsBody').innerHTML = rowsHtml;
+
+    document.getElementById('vatSubtotal').textContent  = fmtMoney(p.subtotal);
+    document.getElementById('vatVatRate').textContent   = (p.vat_rate || 0) + '%';
+    document.getElementById('vatVatAmount').textContent = fmtMoney(p.vat_amount);
+    document.getElementById('vatTotal').textContent     = fmtMoney(p.total_amount);
+    document.getElementById('vatWords').textContent     = p.total_words || '';
+
+    document.getElementById('btnConfirmVAT').dataset.invId = invId;
+}
+
+async function pushToBAKV(invId) {
+    const btn = document.getElementById('btnConfirmVAT');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Đang gửi BKAV...';
+    try {
+        const res = await fetch('/erp/api/invoice/push_invoice.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ invoice_id: parseInt(invId), csrf_token: CSRF_TOKEN })
+        }).then(r => r.json());
+        if (res.success) {
+            bootstrap.Modal.getInstance(document.getElementById('modalVAT')).hide();
+            alert('✅ Xuất hoá đơn thành công! Số HĐ BKAV: ' + res.invoiceNo);
+            location.reload();
+        } else {
+            alert('❌ Lỗi: ' + res.message);
+        }
+    } catch (err) {
+        alert('Lỗi kết nối khi gửi BKAV.');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-paper-plane me-1"></i>Xác nhận xuất BKAV';
+    }
+}
 
 document.getElementById('btnSavePay').addEventListener('click', () => {
     const form = document.getElementById('formPay');
@@ -717,4 +796,86 @@ function fmtDate(d) {
     return `${day}/${m}/${y}`;
 }
 </script>
+
+<!-- ============ MODAL VAT BKAV ============ -->
+<div class="modal fade" id="modalVAT" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title">
+                    <i class="fas fa-file-invoice-dollar me-2"></i>Preview xuất hoá đơn VAT BKAV
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Thông tin HĐ nội bộ -->
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <span class="text-muted small">Số HĐ nội bộ:</span>
+                        <strong id="vatInvoiceNo" class="ms-1"></strong>
+                    </div>
+                    <div class="col-md-6">
+                        <span class="text-muted small">Ngày HĐ:</span>
+                        <strong id="vatInvoiceDate" class="ms-1"></strong>
+                    </div>
+                </div>
+                <!-- Seller -->
+                <div class="card border-0 bg-light mb-3">
+                    <div class="card-body py-2">
+                        <div class="fw-bold small text-uppercase text-muted mb-1">Người bán</div>
+                        <div><strong id="vatSellerName"></strong></div>
+                        <div class="small text-muted">MST: <span id="vatSellerTax"></span></div>
+                        <div class="small text-muted"><span id="vatSellerAddress"></span></div>
+                    </div>
+                </div>
+                <!-- Buyer -->
+                <div class="card border-0 bg-light mb-3">
+                    <div class="card-body py-2">
+                        <div class="fw-bold small text-uppercase text-muted mb-1">Người mua</div>
+                        <div><strong id="vatBuyerName"></strong> – <span id="vatBuyerUnit"></span></div>
+                        <div class="small text-muted"><span id="vatBuyerAddress"></span></div>
+                        <div class="small text-muted">MST: <span id="vatBuyerTax"></span></div>
+                        <div class="small text-muted">TK: <span id="vatBuyerBank"></span></div>
+                    </div>
+                </div>
+                <!-- Items -->
+                <div class="table-responsive mb-3">
+                    <table class="table table-bordered table-sm align-middle mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>#</th>
+                                <th>Tên hàng hoá / dịch vụ</th>
+                                <th class="text-center">ĐVT</th>
+                                <th class="text-end">Số lượng</th>
+                                <th class="text-end">Đơn giá</th>
+                                <th class="text-end">Thành tiền</th>
+                            </tr>
+                        </thead>
+                        <tbody id="vatItemsBody"></tbody>
+                    </table>
+                </div>
+                <!-- Tổng -->
+                <div class="d-flex flex-column align-items-end gap-1 mb-2">
+                    <div class="small">Tạm tính: <strong id="vatSubtotal"></strong></div>
+                    <div class="small">VAT (<span id="vatVatRate"></span>): <strong id="vatVatAmount"></strong></div>
+                    <div class="fs-6 fw-bold text-success">Tổng cộng: <span id="vatTotal"></span></div>
+                </div>
+                <div class="alert alert-light border py-2 small">
+                    <i class="fas fa-info-circle me-1 text-muted"></i>
+                    Bằng chữ: <em id="vatWords"></em>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i>Đóng
+                </button>
+                <button type="button" class="btn btn-warning" id="btnConfirmVAT"
+                        onclick="pushToBAKV(this.dataset.invId)">
+                    <i class="fas fa-paper-plane me-1"></i>Xác nhận xuất BKAV
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <?php include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/footer.php'; ?>
