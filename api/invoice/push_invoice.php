@@ -11,11 +11,9 @@ define('BKAV_RAW_RESPONSE_MAX_LENGTH', 65535);
 
 function bkav_log(string $msg): void {
     $dir = $_SERVER['DOCUMENT_ROOT'] . '/erp/tmp';
-    if (!is_dir($dir)) {
-        mkdir($dir, 0755, true);
-    }
-    $line = '[' . date('Y-m-d H:i:s') . '] ' . $msg . PHP_EOL;
-    file_put_contents($dir . '/bkav_debug.log', $line, FILE_APPEND | LOCK_EX);
+    if (!is_dir($dir)) mkdir($dir, 0755, true);
+    file_put_contents($dir . '/bkav_debug.log',
+        '[' . date('Y-m-d H:i:s') . '] ' . $msg . PHP_EOL, FILE_APPEND | LOCK_EX);
 }
 
 function sanitize(string $s, int $max): string {
@@ -23,14 +21,13 @@ function sanitize(string $s, int $max): string {
     return mb_substr($s, 0, $max, 'UTF-8');
 }
 
+// ── AES-256-CBC + gzip + base64 (theo chuẩn BKAV) ─────────────────────
 function bkavEncrypt(string $data): string {
-    $key  = base64_decode(BKAV_AES_KEY);
-    $iv   = base64_decode(BKAV_AES_IV);
-    $comp = gzcompress($data, 9);
-    $enc  = openssl_encrypt($comp, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
-    if ($enc === false) {
-        throw new RuntimeException('openssl_encrypt thất bại: ' . openssl_error_string());
-    }
+    $key = base64_decode(BKAV_AES_KEY);
+    $iv  = base64_decode(BKAV_AES_IV);
+    $gz  = gzencode($data, 6);           // gzencode (gzip), không phải gzcompress
+    $enc = openssl_encrypt($gz, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
+    if ($enc === false) throw new RuntimeException('openssl_encrypt thất bại: ' . openssl_error_string());
     return base64_encode($enc);
 }
 
@@ -38,20 +35,17 @@ function bkavDecrypt(string $data): string {
     $key  = base64_decode(BKAV_AES_KEY);
     $iv   = base64_decode(BKAV_AES_IV);
     $raw  = base64_decode($data);
+    if ($raw === false) throw new RuntimeException('base64_decode thất bại');
     $dec  = openssl_decrypt($raw, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
-    if ($dec === false) {
-        throw new RuntimeException('openssl_decrypt thất bại');
-    }
-    $ungz = @gzuncompress($dec);
+    if ($dec === false) throw new RuntimeException('openssl_decrypt thất bại');
+    $ungz = @gzdecode($dec);             // gzdecode tương ứng với gzencode
     return $ungz !== false ? $ungz : $dec;
 }
 
+// ── Gọi SOAP: ExecuteCommand (đúng API BKAV eHoaDon) ──────────────────
 function bkavSoapCall(string $encData): string {
     $wsUrl = BKAV_WS_URL;
     $guid  = BKAV_PARTNER_GUID;
-
-    // Tắt SSL verify khi ở môi trường sandbox / XAMPP localhost
-    // vì PHP không có CA bundle → "SSL certificate problem: unable to get local issuer certificate"
     $isProduction = defined('BKAV_ENV') && BKAV_ENV === 'production';
 
     $soapBody = '<?xml version="1.0" encoding="utf-8"?>
@@ -59,10 +53,10 @@ function bkavSoapCall(string $encData): string {
                xmlns:xsd="http://www.w3.org/2001/XMLSchema"
                xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Body>
-    <ImportAndPublishInvoice xmlns="http://tempuri.org/">
-      <strPartnerGUID>' . htmlspecialchars($guid, ENT_XML1) . '</strPartnerGUID>
-      <strSendData>' . htmlspecialchars($encData, ENT_XML1) . '</strSendData>
-    </ImportAndPublishInvoice>
+    <ExecuteCommand xmlns="http://tempuri.org/">
+      <PartnerGUID>' . htmlspecialchars($guid, ENT_XML1) . '</PartnerGUID>
+      <EncryptedCommandData>' . htmlspecialchars($encData, ENT_XML1) . '</EncryptedCommandData>
+    </ExecuteCommand>
   </soap:Body>
 </soap:Envelope>';
 
@@ -74,12 +68,11 @@ function bkavSoapCall(string $encData): string {
         CURLOPT_ENCODING       => '',
         CURLOPT_HTTPHEADER     => [
             'Content-Type: text/xml; charset=utf-8',
-            'SOAPAction: "http://tempuri.org/ImportAndPublishInvoice"',
+            'SOAPAction: "http://tempuri.org/ExecuteCommand"',
             'Content-Length: ' . strlen($soapBody),
         ],
         CURLOPT_CONNECTTIMEOUT => (int)(defined('BKAV_TIMEOUT_CONNECT') ? BKAV_TIMEOUT_CONNECT : 10),
         CURLOPT_TIMEOUT        => (int)(defined('BKAV_TIMEOUT_READ')    ? BKAV_TIMEOUT_READ    : 60),
-        // Production: verify SSL | Sandbox/dev: bỏ qua để tránh lỗi CA trên XAMPP
         CURLOPT_SSL_VERIFYPEER => $isProduction,
         CURLOPT_SSL_VERIFYHOST => $isProduction ? 2 : 0,
     ]);
@@ -89,11 +82,9 @@ function bkavSoapCall(string $encData): string {
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    if ($response === false) {
-        throw new RuntimeException('cURL error: ' . $err);
-    }
+    if ($response === false) throw new RuntimeException('cURL error: ' . $err);
     if ($httpCode !== 200) {
-        bkav_log("HTTP {$httpCode}: " . substr((string)$response, 0, 500));
+        bkav_log("HTTP {$httpCode}: " . substr((string)$response, 0, 1000));
         throw new RuntimeException("BKAV trả HTTP {$httpCode}");
     }
     return (string)$response;
@@ -102,11 +93,9 @@ function bkavSoapCall(string $encData): string {
 function numberToWordsVN(float $amount): string {
     $amount = (int) round($amount);
     if ($amount === 0) return 'Không đồng';
-
     $ones  = ['', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín'];
     $teens = ['mười', 'mười một', 'mười hai', 'mười ba', 'mười bốn', 'mười lăm',
               'mười sáu', 'mười bảy', 'mười tám', 'mười chín'];
-
     $readThree = function(int $n) use ($ones, $teens, &$readThree): string {
         if ($n === 0) return '';
         if ($n < 10) return $ones[$n];
@@ -114,24 +103,16 @@ function numberToWordsVN(float $amount): string {
         if ($n < 100) {
             $r = $ones[(int)($n / 10)] . ' mươi';
             $u = $n % 10;
-            if ($u === 5)      $r .= ' lăm';
-            elseif ($u === 1)  $r .= ' mốt';
-            elseif ($u > 0)    $r .= ' ' . $ones[$u];
+            if ($u === 5) $r .= ' lăm'; elseif ($u === 1) $r .= ' mốt'; elseif ($u > 0) $r .= ' ' . $ones[$u];
             return $r;
         }
-        $r   = $ones[(int)($n / 100)] . ' trăm';
-        $rem = $n % 100;
+        $r = $ones[(int)($n / 100)] . ' trăm'; $rem = $n % 100;
         if ($rem > 0 && $rem < 10) $r .= ' linh ' . $ones[$rem];
-        elseif ($rem > 0)           $r .= ' ' . $readThree($rem);
+        elseif ($rem > 0) $r .= ' ' . $readThree($rem);
         return $r;
     };
-
-    $units  = ['', ' nghìn', ' triệu', ' tỷ'];
-    $groups = [];
-    while ($amount > 0) {
-        $groups[] = $amount % 1000;
-        $amount   = (int)($amount / 1000);
-    }
+    $units = ['', ' nghìn', ' triệu', ' tỷ']; $groups = [];
+    while ($amount > 0) { $groups[] = $amount % 1000; $amount = (int)($amount / 1000); }
     $parts = [];
     foreach (array_reverse($groups, true) as $i => $g) {
         if ($g > 0) $parts[] = $readThree($g) . $units[$i];
@@ -139,69 +120,62 @@ function numberToWordsVN(float $amount): string {
     return ucfirst(implode(' ', $parts)) . ' đồng';
 }
 
+// ── Parse XML response BKAV (3 cách fallback) ─────────────────────────
 function parseBkavResponse(string $rawXml): array {
+    // Strip BOM
+    $rawXml = preg_replace('/^\xEF\xBB\xBF/', '', trim($rawXml));
     $jsonStr = null;
 
-    // Cách 1: SimpleXML xpath
-    try {
-        $xml = @simplexml_load_string($rawXml);
-        if ($xml) {
-            $nodes = $xml->xpath('//ImportAndPublishInvoiceResult') ?:
-                     $xml->xpath('//*[local-name()="ImportAndPublishInvoiceResult"]');
-            if (!empty($nodes)) {
-                $jsonStr = (string) $nodes[0];
-            }
-        }
-    } catch (Throwable $e) {
-        bkav_log('SimpleXML parse error: ' . $e->getMessage());
+    // Cách 1: SimpleXML xpath — tìm ExecuteCommandResult
+    libxml_use_internal_errors(true);
+    $xml = @simplexml_load_string($rawXml);
+    if ($xml instanceof SimpleXMLElement) {
+        $nodes = $xml->xpath('//*[local-name()="ExecuteCommandResult"]');
+        if (!empty($nodes)) $jsonStr = trim((string)$nodes[0]);
     }
+    libxml_clear_errors();
+    libxml_use_internal_errors(false);
 
     // Cách 2: DOMDocument
-    if ($jsonStr === null) {
-        try {
-            $dom = new DOMDocument();
-            if (@$dom->loadXML($rawXml)) {
-                $nodes = $dom->getElementsByTagName('ImportAndPublishInvoiceResult');
-                if ($nodes->length > 0) {
-                    $jsonStr = $nodes->item(0)->textContent;
-                }
-            }
-        } catch (Throwable $e) {
-            bkav_log('DOMDocument parse error: ' . $e->getMessage());
+    if ($jsonStr === null || $jsonStr === '') {
+        $dom = new DOMDocument();
+        if (@$dom->loadXML($rawXml)) {
+            $nl = $dom->getElementsByTagNameNS('http://tempuri.org/', 'ExecuteCommandResult');
+            if ($nl->length === 0) $nl = $dom->getElementsByTagName('ExecuteCommandResult');
+            if ($nl->length > 0) $jsonStr = trim($nl->item(0)->textContent);
         }
     }
 
     // Cách 3: Regex fallback
-    if ($jsonStr === null) {
-        if (preg_match('/<ImportAndPublishInvoiceResult[^>]*>(.*?)<\/ImportAndPublishInvoiceResult>/s', $rawXml, $m)) {
-            $jsonStr = html_entity_decode($m[1], ENT_XML1 | ENT_QUOTES, 'UTF-8');
+    if ($jsonStr === null || $jsonStr === '') {
+        if (preg_match('/<ExecuteCommandResult[^>]*>(.*?)<\/ExecuteCommandResult>/s', $rawXml, $m)) {
+            $jsonStr = trim($m[1]);
         }
     }
 
-    if ($jsonStr === null) {
-        throw new RuntimeException('Không thể parse XML response từ BKAV');
+    if ($jsonStr === null || $jsonStr === '') {
+        throw new RuntimeException('Không thể parse ExecuteCommandResult từ BKAV. Raw: ' . substr($rawXml, 0, 500));
     }
 
+    // Parse JSON trực tiếp, nếu không thì decrypt
     $data = json_decode($jsonStr, true);
     if (json_last_error() !== JSON_ERROR_NONE) {
         try {
-            $decrypted = bkavDecrypt($jsonStr);
-            $data = json_decode($decrypted, true);
+            $dec  = bkavDecrypt($jsonStr);
+            bkav_log('Decrypted response (200): ' . substr($dec, 0, 200));
+            $data = json_decode($dec, true);
         } catch (Throwable $e) {
             throw new RuntimeException('Không thể parse JSON response: ' . $e->getMessage());
         }
     }
 
-    if (!is_array($data)) {
-        throw new RuntimeException('Response không phải JSON hợp lệ');
-    }
+    if (!is_array($data)) throw new RuntimeException('Response không phải JSON hợp lệ');
     return $data;
 }
 
 function getInvoiceData(PDO $pdo, int $invoiceId): ?array {
     $stmt = $pdo->prepare("
-        SELECT i.*,
-               c.customer_name, c.address, c.tax_code
+        SELECT i.*, c.customer_name, c.address, c.tax_code
         FROM invoices i
         LEFT JOIN customers c ON i.customer_id = c.id
         WHERE i.id = ?
@@ -209,59 +183,86 @@ function getInvoiceData(PDO $pdo, int $invoiceId): ?array {
     $stmt->execute([$invoiceId]);
     $inv = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$inv) return null;
-
-    $stmtItems = $pdo->prepare("
+    $stmt2 = $pdo->prepare("
         SELECT ii.*, pc.product_code
         FROM invoice_items ii
         JOIN product_codes pc ON ii.product_code_id = pc.id
-        WHERE ii.invoice_id = ?
-        ORDER BY ii.id
+        WHERE ii.invoice_id = ? ORDER BY ii.id
     ");
-    $stmtItems->execute([$invoiceId]);
-    $inv['items'] = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
-
+    $stmt2->execute([$invoiceId]);
+    $inv['items'] = $stmt2->fetchAll(PDO::FETCH_ASSOC);
     return $inv;
 }
 
+// ── Build payload theo chuẩn CmdType:100 của BKAV ExecuteCommand ──────
 function buildBkavPayload(array $inv): array {
-    $vatRate = (float)($inv['vat_rate'] ?? 0);
-    $items   = [];
+    $vatRate  = (float)($inv['vat_rate'] ?? 0);
+    $vatPct   = (int)round($vatRate);          // vat_rate lưu theo %, ví dụ: 8
+    $vatDecimal = $vatPct / 100;               // 0.08
+
+    $grandTotal = (float)($inv['subtotal']   ?? 0);
+    $totalTax   = (float)($inv['vat_amount'] ?? 0);
+    $grandWithTax = (float)($inv['total_amount'] ?? 0);
+
+    $itemList = [];
+    $sumTax   = 0;
+    $cnt      = count($inv['items']);
     foreach ($inv['items'] as $idx => $it) {
-        $items[] = [
-            'ItemCode'     => sanitize($it['product_code'] ?? '', 50),
-            'ItemName'     => sanitize($it['description']  ?? '', 500),
-            'UnitName'     => sanitize($it['unit']         ?? '', 50),
-            'Quantity'     => (float) $it['quantity'],
-            'UnitPrice'    => (float) $it['unit_price'],
-            'Amount'       => (float) $it['total_price'],
-            'TaxRateValue' => $vatRate,
-            'TaxAmount'    => round((float)$it['total_price'] * ($vatRate / 100)),
-            'IsDiscount'   => false,
-            'ItemOrder'    => $idx + 1,
+        $lineAmt = (int)round((float)$it['total_price']);
+        // Dòng cuối: bù phần lẻ để tổng tax khớp
+        $lineTax = ($idx < $cnt - 1)
+            ? (int)round($lineAmt * $vatDecimal)
+            : (int)$totalTax - $sumTax;
+        $sumTax += $lineTax;
+
+        $itemList[] = [
+            'ItemName'                  => sanitize((string)($it['description']  ?? ''), 150),
+            'UnitName'                  => sanitize((string)($it['unit']          ?? ''), 20),
+            'UnitPrice'                 => (float)$it['unit_price'],
+            'Quantity'                  => (float)$it['quantity'],
+            'ItemTotalAmountWithoutTax' => $lineAmt,
+            'TaxPercentage'             => $vatPct,
+            'TaxAmount'                 => $lineTax,
+            'ItemTotalAmount'           => $lineAmt + $lineTax,
+            'IsIncreaseItem'            => true,
         ];
     }
 
     return [
-        'InvoiceType'                  => BKAV_INVOICE_TYPE,
-        'InvoiceTemplate'              => BKAV_INVOICE_TEMPLATE,
-        'InvoiceSerial'                => BKAV_INVOICE_SERIAL,
-        'InvoiceDate'                  => date('Y-m-d\TH:i:s', strtotime($inv['invoice_date'] ?? 'now')),
-        'PaymentMethodName'            => BKAV_PAYMENT_METHOD,
-        'BuyerName'                    => sanitize($inv['customer_name'] ?? '', 200),
-        'BuyerUnitName'                => sanitize($inv['customer_name'] ?? '', 200),
-        'BuyerAddress'                 => sanitize($inv['address']       ?? '', 500),
-        'BuyerTaxCode'                 => sanitize($inv['tax_code']      ?? '', 50),
-        'InvoiceTotalAmountWithoutTax' => (float)($inv['subtotal']     ?? 0),
-        'InvoiceTotalTaxAmount'        => (float)($inv['vat_amount']   ?? 0),
-        'InvoiceTotalAmount'           => (float)($inv['total_amount'] ?? 0),
-        'InvoiceTotalAmountInWords'    => numberToWordsVN((float)($inv['total_amount'] ?? 0)),
-        'SellerTaxCode'                => defined('COMPANY_TAX')     ? COMPANY_TAX     : '',
-        'SellerFullName'               => defined('COMPANY_NAME')    ? COMPANY_NAME    : '',
-        'SellerAddress'                => defined('COMPANY_ADDRESS') ? COMPANY_ADDRESS : '',
-        'SellerBankName'               => defined('COMPANY_BANK')    ? COMPANY_BANK    : '',
-        'SellerBankAccount'            => defined('COMPANY_ACCOUNT') ? COMPANY_ACCOUNT : '',
-        'InvoiceGroupItemList'         => $items,
-        'ExternalRefNumber'            => sanitize($inv['invoice_no'] ?? '', 50),
+        'CmdType' => 100,
+        'Invoice' => [
+            'InvoiceType'                  => BKAV_INVOICE_TYPE,
+            'InvoiceTemplateCode'          => BKAV_INVOICE_TEMPLATE,
+            'InvoiceSerial'                => BKAV_INVOICE_SERIAL,
+            'InvoiceIssuedDate'            => date('Y-m-d\TH:i:s', strtotime($inv['invoice_date'] ?? 'now')),
+            'CurrencyUnit'                 => 'VND',
+            'ExchangeRate'                 => 1,
+            'PaymentMethodName'            => BKAV_PAYMENT_METHOD,
+            // Buyer
+            'BuyerName'                    => sanitize($inv['customer_name'] ?? '', 120),
+            'BuyerTaxCode'                 => sanitize($inv['tax_code']      ?? '', 50),
+            'BuyerUnitName'                => sanitize($inv['customer_name'] ?? '', 120),
+            'BuyerAddress'                 => sanitize($inv['address']       ?? '', 200),
+            // Seller
+            'SellerTaxCode'                => defined('COMPANY_TAX')     ? COMPANY_TAX     : '',
+            'SellerLegalName'              => sanitize(defined('COMPANY_NAME')    ? COMPANY_NAME    : '', 200),
+            'SellerAddress'                => sanitize(defined('COMPANY_ADDRESS') ? COMPANY_ADDRESS : '', 250),
+            'SellerBankAccount'            => defined('COMPANY_ACCOUNT') ? preg_replace('/[^0-9]/', '', COMPANY_ACCOUNT) : '',
+            'SellerBankName'               => sanitize(defined('COMPANY_BANK') ? COMPANY_BANK : '', 150),
+            // Items
+            'InvoiceGroupItemList'         => $itemList,
+            // Tax breakdown
+            'InvoiceTaxBreakdowns'         => [[
+                'TaxPercentage' => $vatPct,
+                'TaxableAmount' => (int)$grandTotal,
+                'TaxAmount'     => (int)$totalTax,
+            ]],
+            // Totals
+            'InvoiceTotalAmountWithoutTax' => (int)$grandTotal,
+            'InvoiceTotalTaxAmount'        => (int)$totalTax,
+            'InvoiceTotalAmount'           => (int)$grandWithTax,
+            'InvoiceTotalAmountInWords'    => numberToWordsVN($grandWithTax),
+        ],
     ];
 }
 
@@ -274,16 +275,13 @@ $method = $_SERVER['REQUEST_METHOD'];
 // ── GET preview ──────────────────────────────────────────
 if ($method === 'GET' && isset($_GET['preview'])) {
     $invoiceId = (int)($_GET['invoice_id'] ?? 0);
-    if (!$invoiceId) {
-        echo json_encode(['success' => false, 'message' => 'Thiếu invoice_id']); exit;
-    }
+    if (!$invoiceId) { echo json_encode(['success' => false, 'message' => 'Thiếu invoice_id']); exit; }
 
     $inv = getInvoiceData($pdo, $invoiceId);
-    if (!$inv) {
-        echo json_encode(['success' => false, 'message' => 'Không tìm thấy hoá đơn']); exit;
-    }
+    if (!$inv) { echo json_encode(['success' => false, 'message' => 'Không tìm thấy hoá đơn']); exit; }
 
     $payload = buildBkavPayload($inv);
+    $inv2    = $payload['Invoice'];
 
     echo json_encode([
         'success' => true,
@@ -291,17 +289,17 @@ if ($method === 'GET' && isset($_GET['preview'])) {
             'invoice_no'     => $inv['invoice_no'],
             'invoice_date'   => $inv['invoice_date'],
             'customer_name'  => $inv['customer_name'],
-            'address'        => $inv['address']       ?? '',
-            'tax_code'       => $inv['tax_code']      ?? '',
-            'subtotal'       => $inv['subtotal'],
+            'address'        => $inv['address']  ?? '',
+            'tax_code'       => $inv['tax_code'] ?? '',
+            'subtotal'       => $inv2['InvoiceTotalAmountWithoutTax'],
             'vat_rate'       => $inv['vat_rate'],
-            'vat_amount'     => $inv['vat_amount'],
-            'total_amount'   => $inv['total_amount'],
-            'total_words'    => $payload['InvoiceTotalAmountInWords'],
+            'vat_amount'     => $inv2['InvoiceTotalTaxAmount'],
+            'total_amount'   => $inv2['InvoiceTotalAmount'],
+            'total_words'    => $inv2['InvoiceTotalAmountInWords'],
             'items'          => $inv['items'],
-            'seller_name'    => defined('COMPANY_NAME')    ? COMPANY_NAME    : '',
-            'seller_tax'     => defined('COMPANY_TAX')     ? COMPANY_TAX     : '',
-            'seller_address' => defined('COMPANY_ADDRESS') ? COMPANY_ADDRESS : '',
+            'seller_name'    => $inv2['SellerLegalName'],
+            'seller_tax'     => $inv2['SellerTaxCode'],
+            'seller_address' => $inv2['SellerAddress'],
             'bkav_invoice_no'=> $inv['bkav_invoice_no'] ?? null,
         ],
     ], JSON_UNESCAPED_UNICODE);
@@ -311,53 +309,47 @@ if ($method === 'GET' && isset($_GET['preview'])) {
 // ── POST gửi BKAV ────────────────────────────────────────
 if ($method === 'POST') {
     $body = json_decode(file_get_contents('php://input'), true);
-    if (!$body) {
-        echo json_encode(['success' => false, 'message' => 'Request body không hợp lệ']); exit;
-    }
-
-    if (!verifyCSRF($body['csrf_token'] ?? '')) {
-        echo json_encode(['success' => false, 'message' => 'CSRF không hợp lệ']); exit;
-    }
+    if (!$body) { echo json_encode(['success' => false, 'message' => 'Request body không hợp lệ']); exit; }
+    if (!verifyCSRF($body['csrf_token'] ?? '')) { echo json_encode(['success' => false, 'message' => 'CSRF không hợp lệ']); exit; }
 
     $invoiceId = (int)($body['invoice_id'] ?? 0);
-    if (!$invoiceId) {
-        echo json_encode(['success' => false, 'message' => 'Thiếu invoice_id']); exit;
-    }
+    if (!$invoiceId) { echo json_encode(['success' => false, 'message' => 'Thiếu invoice_id']); exit; }
 
     $inv = getInvoiceData($pdo, $invoiceId);
-    if (!$inv) {
-        echo json_encode(['success' => false, 'message' => 'Không tìm thấy hoá đơn']); exit;
-    }
+    if (!$inv) { echo json_encode(['success' => false, 'message' => 'Không tìm thấy hoá đơn']); exit; }
 
     try {
         $payload  = buildBkavPayload($inv);
         $jsonData = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $encData  = bkavEncrypt($jsonData);
 
-        bkav_log("Sending invoice_id={$invoiceId} invoice_no={$inv['invoice_no']} env=" . (defined('BKAV_ENV') ? BKAV_ENV : 'unknown'));
+        bkav_log("Sending invoice_id={$invoiceId} invoice_no={$inv['invoice_no']} env=" . BKAV_ENV);
+        bkav_log("Payload JSON (500): " . substr($jsonData, 0, 500));
 
-        $rawXml  = bkavSoapCall($encData);
-        bkav_log("Raw response (first 500): " . substr($rawXml, 0, 500));
+        $rawXml = bkavSoapCall($encData);
+        bkav_log("Raw SOAP response (500): " . substr($rawXml, 0, 500));
 
-        $result  = parseBkavResponse($rawXml);
+        $result = parseBkavResponse($rawXml);
         bkav_log("Parsed result: " . json_encode($result, JSON_UNESCAPED_UNICODE));
+
+        // BKAV trả Status=0 là thành công
+        $status    = $result['Status'] ?? $result['ErrorCode'] ?? $result['error_code'] ?? null;
+        $isSuccess = ($status === 0 || $status === '0');
 
         $bkavInvoiceNo = $result['InvoiceNo']
             ?? $result['invoiceNo']
             ?? $result['invoice_no']
-            ?? ($result['data']['InvoiceNo'] ?? null);
-
-        $isSuccess = isset($result['ErrorCode']) && (int)$result['ErrorCode'] === 0;
-        if (!$isSuccess && isset($result['error_code'])) {
-            $isSuccess = (int)$result['error_code'] === 0;
-        }
+            ?? ($result['Object']['InvoiceNo'] ?? null)
+            ?? ($result['data']['InvoiceNo']   ?? null);
 
         if (!$isSuccess) {
-            $errMsg = $result['Description'] ?? $result['message'] ?? $result['Message'] ?? 'Lỗi không xác định';
+            $errMsg = $result['Object'] ?? $result['Description'] ?? $result['Message'] ?? $result['message'] ?? 'Lỗi không xác định từ BKAV';
+            if (is_array($errMsg)) $errMsg = json_encode($errMsg, JSON_UNESCAPED_UNICODE);
             bkav_log("BKAV error: " . $errMsg);
             $pdo->prepare("UPDATE invoices SET bkav_status='error', bkav_raw_response=? WHERE id=?")
                 ->execute([substr($rawXml, 0, BKAV_RAW_RESPONSE_MAX_LENGTH), $invoiceId]);
-            echo json_encode(['success' => false, 'message' => 'BKAV trả lỗi: ' . $errMsg], JSON_UNESCAPED_UNICODE); exit;
+            echo json_encode(['success' => false, 'message' => 'BKAV trả lỗi: ' . $errMsg], JSON_UNESCAPED_UNICODE);
+            exit;
         }
 
         $pdo->prepare("
@@ -367,7 +359,6 @@ if ($method === 'POST') {
         ")->execute([$bkavInvoiceNo, substr($rawXml, 0, BKAV_RAW_RESPONSE_MAX_LENGTH), $invoiceId]);
 
         bkav_log("Success: bkav_invoice_no={$bkavInvoiceNo}");
-
         echo json_encode([
             'success'   => true,
             'invoiceNo' => $bkavInvoiceNo,
