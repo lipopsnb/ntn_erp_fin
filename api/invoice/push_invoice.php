@@ -198,8 +198,7 @@ function parseBkavResponse(string $rawXml): array {
 function getInvoiceData(PDO $pdo, int $invoiceId): ?array {
     $stmt = $pdo->prepare("
         SELECT i.*,
-               c.customer_name, c.contact_person, c.address,
-               c.tax_code, c.bank_account, c.bank_name
+               c.customer_name, c.address, c.tax_code
         FROM invoices i
         LEFT JOIN customers c ON i.customer_id = c.id
         WHERE i.id = ?
@@ -239,10 +238,7 @@ function buildBkavPayload(array $inv): array {
         ];
     }
 
-    $buyerName = sanitize(
-        !empty($inv['contact_person']) ? $inv['contact_person'] : ($inv['customer_name'] ?? ''),
-        200
-    );
+    $buyerName = sanitize($inv['customer_name'] ?? '', 200);
 
     $totalWords = numberToWordsVN((float)($inv['total_amount'] ?? 0));
 
@@ -256,8 +252,6 @@ function buildBkavPayload(array $inv): array {
         'BuyerUnitName'                  => sanitize($inv['customer_name'] ?? '', 200),
         'BuyerAddress'                   => sanitize($inv['address'] ?? '', 500),
         'BuyerTaxCode'                   => sanitize($inv['tax_code'] ?? '', 50),
-        'BuyerBankAccount'               => sanitize($inv['bank_account'] ?? '', 100),
-        'BuyerBankName'                  => sanitize($inv['bank_name'] ?? '', 200),
         'InvoiceTotalAmountWithoutTax'   => (float) ($inv['subtotal'] ?? 0),
         'InvoiceTotalTaxAmount'          => (float) ($inv['vat_amount'] ?? 0),
         'InvoiceTotalAmount'             => (float) ($inv['total_amount'] ?? 0),
@@ -299,11 +293,8 @@ if ($method === 'GET' && isset($_GET['preview'])) {
             'invoice_no'     => $inv['invoice_no'],
             'invoice_date'   => $inv['invoice_date'],
             'customer_name'  => $inv['customer_name'],
-            'contact_person' => $inv['contact_person'] ?? '',
             'address'        => $inv['address'] ?? '',
             'tax_code'       => $inv['tax_code'] ?? '',
-            'bank_account'   => $inv['bank_account'] ?? '',
-            'bank_name'      => $inv['bank_name'] ?? '',
             'subtotal'       => $inv['subtotal'],
             'vat_rate'       => $inv['vat_rate'],
             'vat_amount'     => $inv['vat_amount'],
