@@ -373,7 +373,7 @@ function renderVatPreviewDetail(p, invId) {
     document.getElementById('btnConfirmVAT').dataset.invId = invId;
 }
 
-async function pushToBAKV(invId) {
+async function pushToBKAV(invId) {
     const btn = document.getElementById('btnConfirmVAT');
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Đang gửi BKAV...';
@@ -482,7 +482,7 @@ function fmtDate(d) {
                     <i class="fas fa-times me-1"></i>Đóng
                 </button>
                 <button type="button" class="btn btn-warning" id="btnConfirmVAT"
-                        onclick="pushToBAKV(this.dataset.invId)">
+                        onclick="pushToBKAV(this.dataset.invId)">
                     <i class="fas fa-paper-plane me-1"></i>Xác nhận xuất BKAV
                 </button>
             </div>

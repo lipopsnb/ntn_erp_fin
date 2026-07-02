@@ -7,7 +7,8 @@ header('Content-Type: application/json');
 requireLogin();
 requireRole('director', 'accountant');
 
-// ── Logging ──────────────────────────────────────────────────────────────────
+// ── Constantes ───────────────────────────────────────────────────────────────
+define('BKAV_RAW_RESPONSE_MAX_LENGTH', 65535);
 function bkav_log(string $msg): void {
     $dir = $_SERVER['DOCUMENT_ROOT'] . '/erp/tmp';
     if (!is_dir($dir)) {
@@ -367,7 +368,7 @@ if ($method === 'POST') {
             $errMsg = $result['Description'] ?? $result['message'] ?? $result['Message'] ?? 'Lỗi không xác định';
             bkav_log("BKAV error: " . $errMsg);
             $pdo->prepare("UPDATE invoices SET bkav_status='error', bkav_raw_response=? WHERE id=?")
-                ->execute([substr($rawXml, 0, 65535), $invoiceId]);
+                ->execute([substr($rawXml, 0, BKAV_RAW_RESPONSE_MAX_LENGTH), $invoiceId]);
             echo json_encode(['success' => false, 'message' => 'BKAV trả lỗi: ' . $errMsg]); exit;
         }
 
@@ -376,7 +377,7 @@ if ($method === 'POST') {
             UPDATE invoices
             SET bkav_invoice_no=?, bkav_status='issued', bkav_issued_at=NOW(), bkav_raw_response=?
             WHERE id=?
-        ")->execute([$bkavInvoiceNo, substr($rawXml, 0, 65535), $invoiceId]);
+        ")->execute([$bkavInvoiceNo, substr($rawXml, 0, BKAV_RAW_RESPONSE_MAX_LENGTH), $invoiceId]);
 
         bkav_log("Success: bkav_invoice_no={$bkavInvoiceNo}");
 

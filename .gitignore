@@ -4,6 +4,7 @@
 
 # BKAV eHoaDon credentials — do NOT commit
 /erp/config/bkav.php
+config/bkav.php
 
 # Database credentials – use environment variables instead (see config/database.php)
 # config/database.php is intentionally tracked but must NOT contain real credentials
