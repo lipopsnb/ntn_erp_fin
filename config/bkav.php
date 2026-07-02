@@ -15,25 +15,25 @@ define('BKAV_WS_URL',
 );
 
 // ── Xác thực — lấy từ BKAV ──────────────────────────────────
-define('BKAV_PARTNER_GUID', '');       // PartnerGUID do BKAV cấp
-define('BKAV_AES_KEY',      '');       // Base64 của AES Key (32 bytes)
-define('BKAV_AES_IV',       '');       // Base64 của AES IV  (16 bytes)
+define('BKAV_PARTNER_GUID', '4be56c5a-1463-4edb-8494-474f4ab323a3');
+define('BKAV_AES_KEY',      'Cv591cx5CsihPj0htLkayayjk3sAUczrpP+FW6EvB7w='); // 32 bytes base64
+define('BKAV_AES_IV',       'h7UIF1SfQbgF/OPZCWOxvA==');                      // 16 bytes base64
 
 // ── Mẫu hoá đơn ──────────────────────────────────────────────
-define('BKAV_INVOICE_TYPE',     1);           // 1 = Hoá đơn GTGT
-define('BKAV_INVOICE_TEMPLATE', '1');         // Mẫu số
-define('BKAV_INVOICE_SERIAL',   'C26TYY');    // Ký hiệu
+define('BKAV_INVOICE_TYPE',     1);         // 1 = Hoá đơn GTGT
+define('BKAV_INVOICE_TEMPLATE', '1');       // Mẫu số
+define('BKAV_INVOICE_SERIAL',   'C26TYY'); // Ký hiệu
 
 // ── Thanh toán & VAT ─────────────────────────────────────────
 define('BKAV_PAYMENT_METHOD', 'Chuyển khoản');
 define('VAT_RATE_DEFAULT', 0.08); // 0.08 = 8%
 
 // ── Thông tin công ty (Seller) ───────────────────────────────
-define('COMPANY_TAX',     '');   // Mã số thuế
-define('COMPANY_NAME',    '');   // Tên công ty
-define('COMPANY_ADDRESS', '');   // Địa chỉ
-define('COMPANY_BANK',    '');   // Tên ngân hàng
-define('COMPANY_ACCOUNT', '');   // Số tài khoản
+define('COMPANY_TAX',     '0111343796');
+define('COMPANY_NAME',    'CÔNG TY CỔ PHẦN SẢN XUẤT VÀ CUNG ỨNG NTN VIỆT NAM');
+define('COMPANY_ADDRESS', '');  // Điền địa chỉ công ty
+define('COMPANY_BANK',    '');  // Điền tên ngân hàng
+define('COMPANY_ACCOUNT', '');  // Điền số tài khoản
 
 // ── Timeout (giây) ───────────────────────────────────────────
 define('BKAV_TIMEOUT_CONNECT', 10);
