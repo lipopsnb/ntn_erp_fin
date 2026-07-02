@@ -230,22 +230,7 @@ elseif (isGroupActive(['/modules/users/index'])) $activeGroup = 'system';
     </li>
     <?php endif; ?>
 
-    <!-- KPI SẢN XUẤT -->
-    <?php if (hasRole('director','accountant','manager','warehouse','production')): ?>
-    <li class="nav-item">
-      <a class="nav-link sidebar-group-toggle" href="#" data-target="grp-kpi">
-        <i class="fas fa-chart-line"></i><span>KPI sản xuất</span>
-        <i class="fas fa-chevron-down sidebar-arrow"></i>
-      </a>
-      <ul class="sidebar-submenu" id="grp-kpi">
-        <li><a class="nav-link <?= isActive('/modules/kpi/assign') ?>" href="/erp/modules/kpi/assign.php">
-          <i class="fas fa-tasks"></i><span>Phân bổ KPI</span></a></li>
-        <li><a class="nav-link <?= isActive('/modules/kpi/result') ?>" href="/erp/modules/kpi/result.php">
-          <i class="fas fa-clipboard-check"></i><span>Kết quả KPI</span>
-          <span class="badge bg-warning text-dark ms-1" id="sidebarKpiCount"></span></a></li>
-      </ul>
-    </li>
-    <?php endif; ?>
+   
 
     <!-- QUẢN LÝ HỆ THỐNG -->
     <?php if (hasRole('director','accountant')): ?>
