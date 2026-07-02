@@ -104,11 +104,11 @@ elseif (isGroupActive(['/modules/users/index'])) $activeGroup = 'system';
         <i class="fas fa-chevron-down sidebar-arrow"></i>
       </a>
       <ul class="sidebar-submenu" id="grp-payroll">
-        <?php if (hasRole('director','accountant','manager')): ?>
+        <?php if (hasRole('director','accountant')): ?>
         <li><a class="nav-link <?= isActive('/payroll/index') ?>" href="/erp/modules/payroll/index.php">
           <i class="fas fa-money-check-alt"></i><span>Quản lý kỳ lương</span></a></li>
         <?php endif; ?>
-        <?php if (!hasRole('director','accountant','manager')): ?>
+        <?php if (!hasRole('director')): ?>
         <li><a class="nav-link <?= isActive('/payroll/my_payroll') ?>" href="/erp/modules/payroll/my_payroll.php">
           <i class="fas fa-file-invoice-dollar"></i><span>Phiếu lương của tôi</span></a></li>
         <?php endif; ?>
@@ -119,7 +119,7 @@ elseif (isGroupActive(['/modules/users/index'])) $activeGroup = 'system';
     <?php if (!hasRole('employee')): ?>
 
     <!-- DANH MỤC -->
-    <?php if (hasRole('director','accountant','warehouse','production','manager')): ?>
+    <?php if (hasRole('director','accountant','manager')): ?>
     <li class="nav-item">
       <a class="nav-link sidebar-group-toggle" href="#" data-target="grp-master">
         <i class="fas fa-database"></i><span>Danh mục</span>
@@ -169,7 +169,7 @@ elseif (isGroupActive(['/modules/users/index'])) $activeGroup = 'system';
     <?php endif; ?>
 
     <!-- HOÁ ĐƠN -->
-    <?php if (hasRole('director','accountant','manager')): ?>
+    <?php if (hasRole('director','accountant')): ?>
     <li class="nav-item">
       <a class="nav-link sidebar-group-toggle" href="#" data-target="grp-invoice">
         <i class="fas fa-file-invoice"></i><span>Hoá đơn &amp; Công nợ</span>
@@ -185,7 +185,7 @@ elseif (isGroupActive(['/modules/users/index'])) $activeGroup = 'system';
     <?php endif; ?>
 
     <!-- HÀNH CHÍNH -->
-    <?php if (hasRole('director','accountant','manager','warehouse','production')): ?>
+    <?php if (hasRole('director','accountant','manager')): ?>
     <li class="nav-item">
       <a class="nav-link sidebar-group-toggle" href="#" data-target="grp-admin">
         <i class="fas fa-building"></i><span>Hành chính</span>
@@ -197,10 +197,12 @@ elseif (isGroupActive(['/modules/users/index'])) $activeGroup = 'system';
         <?php if (hasRole('director','accountant','manager')): ?>
         <li><a class="nav-link <?= isActive('/admin/assets') ?>" href="/erp/modules/admin/assets.php">
           <i class="fas fa-laptop"></i><span>Tài sản</span></a></li>
+        <?php if (hasRole('director')): ?>
         <li><a class="nav-link <?= isActive('/admin/budget') ?>" href="/erp/modules/admin/budget.php">
           <i class="fas fa-chart-pie"></i><span>Ngân sách HC</span></a></li>
         <?php endif; ?>
-        <?php if (hasRole('director','accountant','manager','warehouse')): ?>
+        <?php endif; ?>
+        <?php if (hasRole('director','accountant','manager')): ?>
         <li><a class="nav-link <?= isActive('/admin/vehicles') ?>" href="/erp/modules/admin/vehicles.php">
           <i class="fas fa-car"></i><span>Phương tiện</span></a></li>
         <?php endif; ?>
