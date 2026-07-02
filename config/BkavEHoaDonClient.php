@@ -1,7 +1,7 @@
 <?php
 /**
  * BkavEHoaDonClient — Tích hợp BKAV eHoaDon 2.0
- * Port từ EHoaDonClient.php đã hoạt động, adapted cho NTN ERP.
+ * Adapted cho NTN ERP.
  *
  * TaxRateID:
  *   1 = 0%    2 = 5%    3 = 10%
@@ -28,10 +28,10 @@ class BkavEHoaDonClient
     ];
 
     private const PAY_METHOD_MAP = [
-        'TM'         => 1,
-        'CK'         => 2,
-        'TM/CK'      => 3,
-        'CHUYENKHOAN'=> 2,
+        'TM'          => 1,
+        'CK'          => 2,
+        'TM/CK'       => 3,
+        'CHUYENKHOAN' => 2,
     ];
 
     public function __construct()
@@ -124,12 +124,18 @@ class BkavEHoaDonClient
             $lineItems[] = $this->buildDescItem($note);
         }
 
-        // Dòng sản phẩm
+        // Dòng sản phẩm + tính tổng tiền
+        $grandTotal  = 0;
+        $totalTaxAmt = 0;
+
         foreach ($items as $it) {
             $qty       = (float)($it['quantity']   ?? 1);
             $unitPrice = (float)($it['unit_price'] ?? 0);
-            $amount    = round($unitPrice * $qty, 0);
-            $vatAmt    = round($amount * $vatPct / 100, 0);
+            $amount    = (int)round($unitPrice * $qty);
+            $vatAmt    = (int)round($amount * $vatPct / 100);
+
+            $grandTotal  += $amount;
+            $totalTaxAmt += $vatAmt;
 
             $lineItems[] = [
                 'ItemTypeID'        => self::ITEM_HANG_HOA,
@@ -145,35 +151,42 @@ class BkavEHoaDonClient
             ];
         }
 
-        $invoiceNo = $this->cleanStr((string)($inv['invoice_no'] ?? ''), 50);
+        $grandWithTax = $grandTotal + $totalTaxAmt;
+        $invoiceNo    = $this->cleanStr((string)($inv['invoice_no'] ?? ''), 50);
+        $issuedAt     = date('Y-m-d\TH:i:s', strtotime($invoiceDate));
 
         return [
             'Invoice' => [
-                'InvoiceTypeID'    => (int)(defined('BKAV_INVOICE_TYPE') ? BKAV_INVOICE_TYPE : 1),
-                'InvoiceDate'      => date('Y-m-d\TH:i:s', strtotime($invoiceDate)),
-                'InvoiceNo'        => 0,
-                'InvoiceForm'      => '',
-                'InvoiceSerial'    => defined('BKAV_INVOICE_SERIAL') ? BKAV_INVOICE_SERIAL : '',
-                'InvoiceStatusID'  => 1,
-                'SignedDate'       => date('Y-m-d\TH:i:s', strtotime($invoiceDate)),
-                'BuyerName'        => $this->cleanStr((string)($inv['customer_name'] ?? ''), 120),
-                'BuyerTaxCode'     => $this->cleanStr((string)($inv['tax_code']      ?? ''), 50),
-                'BuyerUnitName'    => $this->cleanStr((string)($inv['customer_name'] ?? ''), 120),
-                'BuyerAddress'     => $this->cleanStr((string)($inv['address']       ?? ''), 200),
-                'BuyerBankAccount' => '',
-                'PayMethodID'      => $payMethodId,
-                'ReceiveTypeID'    => 1,
-                'ReceiverEmail'    => '',
-                'ReceiverMobile'   => '',
-                'ReceiverName'     => $this->cleanStr((string)($inv['customer_name'] ?? ''), 120),
-                'ReceiverAddress'  => $this->cleanStr((string)($inv['address']       ?? ''), 200),
-                'Note'             => $invoiceNo,
-                'BillCode'         => $invoiceNo,
-                'CurrencyID'       => 'VND',
-                'ExchangeRate'     => 1.0,
-                'MaCuaCQT'         => '',
-                'isBTH'            => 'false',
-                'UserDefine'       => '',
+                'InvoiceTypeID'         => (int)(defined('BKAV_INVOICE_TYPE') ? BKAV_INVOICE_TYPE : 1),
+                'InvoiceDate'           => $issuedAt,
+                'InvoiceNo'             => 0,
+                'InvoiceForm'           => defined('BKAV_INVOICE_TEMPLATE') ? BKAV_INVOICE_TEMPLATE : '',
+                'InvoiceSerial'         => defined('BKAV_INVOICE_SERIAL')   ? BKAV_INVOICE_SERIAL   : '',
+                'InvoiceStatusID'       => 1,
+                'SignedDate'            => $issuedAt,
+                'BuyerName'             => $this->cleanStr((string)($inv['customer_name'] ?? ''), 120),
+                'BuyerTaxCode'          => $this->cleanStr((string)($inv['tax_code']      ?? ''), 50),
+                'BuyerUnitName'         => $this->cleanStr((string)($inv['customer_name'] ?? ''), 120),
+                'BuyerAddress'          => $this->cleanStr((string)($inv['address']       ?? ''), 200),
+                'BuyerBankAccount'      => '',
+                'PayMethodID'           => $payMethodId,
+                'ReceiveTypeID'         => 1,
+                'ReceiverEmail'         => '',
+                'ReceiverMobile'        => '',
+                'ReceiverName'          => $this->cleanStr((string)($inv['customer_name'] ?? ''), 120),
+                'ReceiverAddress'       => $this->cleanStr((string)($inv['address']       ?? ''), 200),
+                'Note'                  => $invoiceNo,
+                'BillCode'              => $invoiceNo,
+                'CurrencyID'            => 'VND',
+                'ExchangeRate'          => 1.0,
+                'MaCuaCQT'              => '',
+                'isBTH'                 => 'false',
+                'UserDefine'            => '',
+                // Gửi explicit tổng tiền — BKAV không cần tự tính
+                'TotalAmountWithoutVAT' => $grandTotal,
+                'TotalVATAmount'        => $totalTaxAmt,
+                'TotalAmount'           => $grandWithTax,
+                'TotalAmountInWords'    => $this->numberToWordsVN($grandWithTax),
             ],
             'ListInvoiceDetailsWS'    => $lineItems,
             'ListInvoiceAttachFileWS' => [],
@@ -183,7 +196,7 @@ class BkavEHoaDonClient
     }
 
     // ──────────────────────────────────────────────────────────────
-    // isSuccess
+    // isSuccess / getErrorMessage
     // ──────────────────────────────────────────────────────────────
 
     public function isSuccess(array $result): bool
@@ -208,7 +221,7 @@ class BkavEHoaDonClient
     }
 
     // ──────────────────────────────────────────────────────────────
-    // PRIVATE
+    // PRIVATE — helpers
     // ──────────────────────────────────────────────────────────────
 
     private function buildDescItem(string $text): array
@@ -227,21 +240,76 @@ class BkavEHoaDonClient
         ];
     }
 
+    /**
+     * Làm sạch chuỗi: loại control chars, normalize whitespace, giới hạn độ dài.
+     */
     private function cleanStr(string $s, int $max): string
     {
-        $s = trim(preg_replace('/[\x00-\x1F\x7F]/u', ' ', $s));
+        $s = preg_replace('/[\x00-\x1F\x7F]+/u', '', trim($s));
+        $s = preg_replace('/\s+/u', ' ', $s);
         return mb_substr($s, 0, $max, 'UTF-8');
     }
+
+    /**
+     * Đọc số tiền thành chữ tiếng Việt.
+     */
+    private function numberToWordsVN(float $amount): string
+    {
+        $amount = (int)round($amount);
+        if ($amount === 0) return 'Không đồng';
+        $ones  = ['', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín'];
+        $teens = ['mười', 'mười một', 'mười hai', 'mười ba', 'mười bốn', 'mười lăm',
+                  'mười sáu', 'mười bảy', 'mười tám', 'mười chín'];
+        $group = function (int $n) use ($ones, $teens): string {
+            if (!$n) return '';
+            $h = intdiv($n, 100); $t = intdiv($n % 100, 10); $u = $n % 10;
+            $s = $h ? $ones[$h] . ' trăm' : '';
+            if ($t === 1)         $s .= ($s ? ' ' : '') . $teens[$u];
+            elseif ($t > 1) {
+                $s .= ($s ? ' ' : '') . $ones[$t] . ' mươi';
+                if ($u === 1)     $s .= ' mốt';
+                elseif ($u === 5) $s .= ' lăm';
+                elseif ($u)       $s .= ' ' . $ones[$u];
+            } elseif ($h && $u)  $s .= ' lẻ ' . $ones[$u];
+            elseif ($u)          $s .= ($s ? ' ' : '') . $ones[$u];
+            return trim($s);
+        };
+        $parts = [];
+        if ($b = intdiv($amount, 1_000_000_000))              $parts[] = $group($b) . ' tỷ';
+        if ($m = intdiv($amount % 1_000_000_000, 1_000_000))  $parts[] = $group($m) . ' triệu';
+        if ($k = intdiv($amount % 1_000_000, 1_000))          $parts[] = $group($k) . ' nghìn';
+        if ($r = $amount % 1_000)                             $parts[] = $group($r);
+        return ucfirst(implode(' ', $parts)) . ' đồng';
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // PRIVATE — crypto & transport
+    // ──────────────────────────────────────────────────────────────
 
     private function encryptPayload(array $payload): string
     {
         $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        $gz   = gzencode($json, 9);
+        $gz   = gzencode($json, 1);
         $enc  = openssl_encrypt($gz, 'AES-256-CBC', $this->aesKey, OPENSSL_RAW_DATA, $this->aesIv);
         if ($enc === false) {
             throw new RuntimeException('AES encrypt thất bại: ' . openssl_error_string());
         }
         return base64_encode($enc);
+    }
+
+    private function decryptResponse(string $base64Data): string
+    {
+        // base64_decode trực tiếp từ chuỗi BKAV trả về — không encode lại
+        $raw = base64_decode($base64Data, true);
+        if ($raw === false) {
+            throw new RuntimeException('base64_decode response thất bại.');
+        }
+        $dec = openssl_decrypt($raw, 'AES-256-CBC', $this->aesKey, OPENSSL_RAW_DATA, $this->aesIv);
+        if ($dec === false) {
+            throw new RuntimeException('Giải mã AES thất bại. Kiểm tra BKAV_AES_KEY và BKAV_AES_IV.');
+        }
+        $ungz = @gzdecode($dec);
+        return $ungz !== false ? $ungz : $dec;
     }
 
     private function execCommand(array $payload): array
@@ -302,13 +370,13 @@ class BkavEHoaDonClient
 
         $resultText = html_entity_decode(trim($m[1]), ENT_QUOTES | ENT_XML1, 'UTF-8');
 
-        // ── Pattern lỗi plain-text từ BKAV: "[!|...|!]" hoặc "[MessageForUser]" ──
+        // ── Pattern lỗi plain-text từ BKAV ──
         if (str_starts_with($resultText, '[MessageForUser]')) {
             $msg = trim(str_replace('[MessageForUser]', '', $resultText));
             throw new RuntimeException('eHoaDon: ' . $msg);
         }
-        if (preg_match('/\[!|.*?|!\]/u', $resultText) || str_contains($resultText, 'Có lỗi xảy ra')) {
-            // Xoá ký hiệu debug của BKAV, giữ phần text đọc được
+        // FIX: escape \| để khớp literal "[!|...|!]", không phải alternation
+        if (preg_match('/\[!\|.*?\|!\]/u', $resultText) || str_contains($resultText, 'Có lỗi xảy ra')) {
             $cleanMsg = preg_replace('/\s*\[!?\|[^\]]*\|?!\]\s*/u', '', $resultText);
             $cleanMsg = preg_replace('/\s*\[#\d+\]\s*/u', '', $cleanMsg);
             throw new RuntimeException('BKAV server lỗi: ' . trim($cleanMsg ?: $resultText));
@@ -323,24 +391,11 @@ class BkavEHoaDonClient
             if ($decoded !== null) return $decoded;
         }
 
-        // Base64 → AES → gzip → JSON
-        $decoded = base64_decode($resultText, true);
-        if ($decoded === false) {
-            // Không phải base64 → có thể là plain-text error khác
-            throw new RuntimeException('BKAV trả lỗi: ' . substr($resultText, 0, 300));
-        }
-
-        $decrypted = openssl_decrypt($decoded, 'AES-256-CBC', $this->aesKey, OPENSSL_RAW_DATA, $this->aesIv);
-        if ($decrypted === false) {
-            throw new RuntimeException('Giải mã AES thất bại. Kiểm tra BKAV_AES_KEY và BKAV_AES_IV.');
-        }
-
-        $final = @gzdecode($decrypted);
-        if ($final === false) $final = $decrypted;
-
-        $result = json_decode($final, true);
+        // Base64 → AES-256-CBC → gzip → JSON
+        $decrypted = $this->decryptResponse($resultText);
+        $result    = json_decode($decrypted, true);
         if ($result === null) {
-            throw new RuntimeException('JSON decode thất bại sau decrypt. Raw(200): ' . substr($final, 0, 200));
+            throw new RuntimeException('JSON decode thất bại sau decrypt. Raw(200): ' . substr($decrypted, 0, 200));
         }
         return $result;
     }
@@ -380,7 +435,7 @@ class BkavEHoaDonClient
 
         $item['_wrapper_status'] = $raw['Status']  ?? null;
         $item['_wrapper_isOk']   = $raw['isOk']    ?? null;
-        $item['_wrapper_isErr']  = $raw['isError'] ?? null;
+        $item['_wrapper_isErr']  = $raw['isError']  ?? null;
         return $item;
     }
 }
