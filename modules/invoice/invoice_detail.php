@@ -3,7 +3,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/erp/config/database.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/erp/config/auth.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/erp/config/functions.php';
 requireLogin();
-requireRole('director','accountant','manager');
+requireRole('director','accountant');
 
 $pdo = getDBConnection();
 $id  = (int)($_GET['id'] ?? 0);
@@ -184,6 +184,20 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                             </tbody>
                             <tfoot class="table-light">
                                 <tr>
+                                    <td colspan="6" class="text-end fw-semibold text-muted">Tạm tính:</td>
+                                    <td class="text-end fw-semibold">
+                                        <?= number_format($inv['subtotal'] ?? array_sum(array_column($items,'total_price'))) ?> đ
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td colspan="6" class="text-end fw-semibold text-muted">
+                                        VAT (<?= number_format((float)($inv['vat_rate'] ?? 0), 0) ?>%):
+                                    </td>
+                                    <td class="text-end fw-semibold text-warning">
+                                        <?= number_format($inv['vat_amount'] ?? 0) ?> đ
+                                    </td>
+                                </tr>
+                                <tr class="border-top border-2">
                                     <td colspan="4" class="text-end fw-bold">Tổng cộng:</td>
                                     <td class="text-end fw-bold">
                                         <?= number_format(array_sum(array_column($items,'quantity'))) ?>
@@ -345,11 +359,10 @@ function renderVatPreviewDetail(p, invId) {
     document.getElementById('vatSellerName').textContent    = p.seller_name || '';
     document.getElementById('vatSellerTax').textContent     = p.seller_tax  || '';
     document.getElementById('vatSellerAddress').textContent = p.seller_address || '';
-    document.getElementById('vatBuyerName').textContent     = p.contact_person || p.customer_name || '';
+    document.getElementById('vatBuyerName').textContent     = p.customer_name || '';
     document.getElementById('vatBuyerUnit').textContent     = p.customer_name  || '';
     document.getElementById('vatBuyerAddress').textContent  = p.address     || '';
     document.getElementById('vatBuyerTax').textContent      = p.tax_code    || '';
-    document.getElementById('vatBuyerBank').textContent     = p.bank_account ? `${p.bank_account} – ${p.bank_name}` : '';
 
     let rowsHtml = '';
     (p.items || []).forEach((it, i) => {
@@ -449,7 +462,6 @@ function fmtDate(d) {
                         <div><strong id="vatBuyerName"></strong> – <span id="vatBuyerUnit"></span></div>
                         <div class="small text-muted"><span id="vatBuyerAddress"></span></div>
                         <div class="small text-muted">MST: <span id="vatBuyerTax"></span></div>
-                        <div class="small text-muted">TK: <span id="vatBuyerBank"></span></div>
                     </div>
                 </div>
                 <div class="table-responsive mb-3">
