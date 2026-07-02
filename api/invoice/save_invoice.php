@@ -4,7 +4,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/erp/config/auth.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/erp/config/functions.php';
 header('Content-Type: application/json');
 requireLogin();
-requireRole('director','accountant','manager');
+requireRole('director','accountant');
 
 $pdo  = getDBConnection();
 $user = currentUser();
