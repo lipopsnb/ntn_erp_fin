@@ -3,7 +3,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/erp/config/database.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/erp/config/auth.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/erp/config/functions.php';
 requireLogin();
-requireRole('director', 'accountant', 'manager', 'warehouse');
+requireRole('director', 'accountant', 'manager');
 
 $pdo = getDBConnection();
 $errors = [];
