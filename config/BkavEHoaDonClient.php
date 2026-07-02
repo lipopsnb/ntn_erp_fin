@@ -307,7 +307,7 @@ class BkavEHoaDonClient
             $msg = trim(str_replace('[MessageForUser]', '', $resultText));
             throw new RuntimeException('eHoaDon: ' . $msg);
         }
-        if (preg_match('/\[!|.*?|!\]/u', $resultText) || str_contains($resultText, 'Có lỗi xảy ra')) {
+        if (preg_match('/\[!\|.*?\|!\]/u', $resultText) || str_contains($resultText, 'Có lỗi xảy ra')) {
             // Xoá ký hiệu debug của BKAV, giữ phần text đọc được
             $cleanMsg = preg_replace('/\s*\[!?\|[^\]]*\|?!\]\s*/u', '', $resultText);
             $cleanMsg = preg_replace('/\s*\[#\d+\]\s*/u', '', $cleanMsg);
