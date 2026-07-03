@@ -48,7 +48,7 @@ function numberToWordsVN(float $amount): string {
 
 function getInvoiceData(PDO $pdo, int $invoiceId): ?array {
     $stmt = $pdo->prepare("
-        SELECT i.*, c.customer_name, c.address, c.tax_code
+        SELECT i.*, c.customer_name, c.address, c.tax_code, c.email AS customer_email
         FROM invoices i
         LEFT JOIN customers c ON i.customer_id = c.id
         WHERE i.id = ?

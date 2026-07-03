@@ -14,6 +14,7 @@ if (!verifyCSRF($_POST['csrf_token'] ?? '')) {
 }
 
 $customerId  = (int)($_POST['customer_id']  ?? 0);
+$id          = (int)($_POST['id']           ?? 0);
 $invoiceDate = trim($_POST['invoice_date']  ?? date('Y-m-d'));
 $dueDate     = trim($_POST['due_date']      ?? '') ?: null;
 $vatRate     = (float)($_POST['vat_rate']   ?? 0);
@@ -48,6 +49,16 @@ foreach ($items as $it) {
 }
 if (empty($validItems)) {
     echo json_encode(['ok'=>false,'msg'=>'Không có dòng hợp lệ']); exit;
+}
+
+// Kiểm tra khoá — chỉ director được sửa hoá đơn đã khoá
+if ($id) {
+    $lockCheck = $pdo->prepare("SELECT is_locked FROM invoices WHERE id = ?");
+    $lockCheck->execute([$id]);
+    $lockRow = $lockCheck->fetch(PDO::FETCH_ASSOC);
+    if ($lockRow && !empty($lockRow['is_locked']) && !hasRole('director')) {
+        echo json_encode(['ok' => false, 'msg' => 'Hoá đơn đã được khoá. Chỉ Giám đốc mới được sửa.']); exit;
+    }
 }
 
 try {
