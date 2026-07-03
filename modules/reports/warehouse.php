@@ -112,6 +112,10 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
 let chartDailyInstance = null;
 let chartStockInstance = null;
 
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 function loadAll() {
   fetch('/erp/api/reports/warehouse.php')
     .then(r => r.json())
@@ -169,7 +173,7 @@ function loadAll() {
       } else {
         lowDiv.innerHTML = d.low_stock_list.map(r =>
           `<div class="d-flex justify-content-between align-items-center border-bottom py-2">
-            <div><small class="fw-bold">${r.item_name}</small></div>
+            <div><small class="fw-bold">${esc(r.item_name)}</small></div>
             <div class="text-end">
               <span class="badge bg-danger">${parseFloat(r.current_stock).toLocaleString()}</span>
               <small class="text-muted ms-1">/ min ${parseFloat(r.min_stock).toLocaleString()}</small>
@@ -185,8 +189,8 @@ function loadAll() {
       } else {
         oldDiv.innerHTML = d.old_finished.map(r =>
           `<div class="d-flex justify-content-between align-items-center border-bottom py-2">
-            <div><small class="fw-bold">${r.lot_no || r.product_code}</small></div>
-            <small class="text-muted">${r.created_at ? r.created_at.substring(0,10) : ''}</small>
+            <div><small class="fw-bold">${esc(r.lot_no || r.product_code)}</small></div>
+            <small class="text-muted">${r.created_at ? esc(r.created_at.substring(0,10)) : ''}</small>
           </div>`
         ).join('');
       }
@@ -198,8 +202,8 @@ function loadAll() {
       } else {
         inactDiv.innerHTML = d.inactive_items.map(r =>
           `<div class="d-flex justify-content-between align-items-center border-bottom py-2">
-            <small class="fw-bold">${r.item_name}</small>
-            <small class="text-muted">${r.last_transaction ? r.last_transaction.substring(0,10) : 'Chưa GD'}</small>
+            <small class="fw-bold">${esc(r.item_name)}</small>
+            <small class="text-muted">${r.last_transaction ? esc(r.last_transaction.substring(0,10)) : 'Chưa GD'}</small>
           </div>`
         ).join('');
       }

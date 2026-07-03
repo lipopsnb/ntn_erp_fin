@@ -131,6 +131,9 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
 let chartRevInstance = null;
 let chartCustInstance = null;
 
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
 function fmtPct(v) { return v.toFixed(1) + '%'; }
 function cmpArrow(cur, prev) {
   if (prev === 0) return '';
@@ -247,9 +250,9 @@ function loadAll() {
       } else {
         tbody.innerHTML = d.orders_progress.map(o => `
           <tr>
-            <td><strong>${o.order_no}</strong></td>
-            <td>${o.customer_name}</td>
-            <td>${o.expected_delivery_date || '<span class="text-muted">Chưa đặt</span>'}</td>
+            <td><strong>${esc(o.order_no)}</strong></td>
+            <td>${esc(o.customer_name)}</td>
+            <td>${o.expected_delivery_date ? esc(o.expected_delivery_date) : '<span class="text-muted">Chưa đặt</span>'}</td>
             <td>${progressBar(o.progress_pct)}</td>
             <td>${statusBadge(o.status)}</td>
           </tr>
@@ -263,7 +266,7 @@ function loadAll() {
       } else {
         alertsList.innerHTML = d.alerts.map(a => {
           const icon = a.level === 'danger' ? 'fa-exclamation-circle' : a.level === 'warning' ? 'fa-exclamation-triangle' : 'fa-check-circle';
-          return `<div class="alert alert-${a.level} py-2 mb-2"><i class="fas ${icon} me-2"></i>${a.message}</div>`;
+          return `<div class="alert alert-${esc(a.level)} py-2 mb-2"><i class="fas ${icon} me-2"></i>${esc(a.message)}</div>`;
         }).join('');
       }
     })

@@ -113,6 +113,10 @@ let chartRevInstance = null;
 let chartExpInstance = null;
 let chartDebtInstance = null;
 
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 function fmt(n) {
   n = parseFloat(n);
   if (n >= 1e9) return (n/1e9).toFixed(1) + ' tỷ';
@@ -220,9 +224,9 @@ function loadAll() {
           return `
             <tr>
               <td>${i + 1}</td>
-              <td>${r.customer_name}</td>
+              <td>${esc(r.customer_name)}</td>
               <td class="text-end fw-bold">${fmt(r.total_debt)}</td>
-              <td>${r.oldest_due_date || '—'}</td>
+              <td>${r.oldest_due_date ? esc(r.oldest_due_date) : '—'}</td>
               <td>${badge}</td>
             </tr>
           `;

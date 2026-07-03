@@ -106,6 +106,9 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
 <script>
 let chartDailyInstance = null;
 
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
 function fmtPct(v) { return parseFloat(v).toFixed(1) + '%'; }
 function statusBadge(s) {
   const map = {pending:'secondary',in_progress:'primary',done:'success',cancelled:'danger'};
@@ -173,9 +176,9 @@ function loadAll() {
       } else {
         tbody.innerHTML = d.orders.map(o => `
           <tr>
-            <td><strong>${o.order_no}</strong></td>
-            <td>${o.customer_name}</td>
-            <td>${o.expected_delivery_date || '<span class="text-muted">—</span>'}</td>
+            <td><strong>${esc(o.order_no)}</strong></td>
+            <td>${esc(o.customer_name)}</td>
+            <td>${o.expected_delivery_date ? esc(o.expected_delivery_date) : '<span class="text-muted">—</span>'}</td>
             <td>${parseFloat(o.qty_total).toLocaleString()}</td>
             <td>${parseFloat(o.qty_done).toLocaleString()}</td>
             <td>${parseFloat(o.qty_error).toLocaleString()}</td>
@@ -193,8 +196,8 @@ function loadAll() {
         soonDiv.innerHTML = d.soon_late.map(o => {
           const pct = o.qty_total > 0 ? (o.qty_done / o.qty_total * 100).toFixed(1) : 0;
           return `<div class="alert alert-warning py-2 mb-2">
-            <strong>${o.order_no}</strong> — ${o.customer_name}<br>
-            <small>Ngày giao: <strong>${o.expected_delivery_date}</strong> | Tiến độ: ${pct}%</small>
+            <strong>${esc(o.order_no)}</strong> — ${esc(o.customer_name)}<br>
+            <small>Ngày giao: <strong>${esc(o.expected_delivery_date)}</strong> | Tiến độ: ${pct}%</small>
           </div>`;
         }).join('');
       }
