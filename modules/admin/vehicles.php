@@ -203,10 +203,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $odometer = trim($_POST['odometer'] ?? '') !== '' ? (int)$_POST['odometer'] : null;
         $note = trim($_POST['note'] ?? '') ?: null;
 
-        if (!fetchOneSafe($pdo, 'SELECT id FROM vehicles WHERE id = ? LIMIT 1', [$vehicleId])) {
-            setFlash('danger', 'Không tìm thấy xe cần thêm bảo dưỡng.');
-        } elseif (!$vehicleId) {
+        if (!$vehicleId) {
             setFlash('danger', 'Thiếu phương tiện cần bảo dưỡng.');
+        } elseif (!fetchOneSafe($pdo, 'SELECT id FROM vehicles WHERE id = ? LIMIT 1', [$vehicleId])) {
+            setFlash('danger', 'Không tìm thấy xe cần thêm bảo dưỡng.');
         } elseif (!$isValidDate($maintenanceDate)) {
             setFlash('danger', 'Ngày bảo dưỡng không hợp lệ.');
         } elseif ($description === '') {

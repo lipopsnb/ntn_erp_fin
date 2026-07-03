@@ -63,21 +63,21 @@ $expenseDepr = round($deprPerMonth * $monthFraction);
 
 $stmtFuel = $pdo->prepare("
     SELECT COALESCE(SUM(amount), 0) FROM vehicle_fuel
-    WHERE DATE(fuel_date) BETWEEN ? AND ?
+    WHERE fuel_date BETWEEN ? AND ?
 ");
 $stmtFuel->execute([$dateFrom, $dateTo]);
 $expenseFuel = (float)$stmtFuel->fetchColumn();
 
 $stmtMaint = $pdo->prepare("
     SELECT COALESCE(SUM(amount), 0) FROM vehicle_maintenance
-    WHERE DATE(maintenance_date) BETWEEN ? AND ?
+    WHERE maintenance_date BETWEEN ? AND ?
 ");
 $stmtMaint->execute([$dateFrom, $dateTo]);
 $expenseMaintenance = (float)$stmtMaint->fetchColumn();
 
 $stmtToll = $pdo->prepare("
     SELECT COALESCE(SUM(toll_fee), 0) FROM vehicle_trips
-    WHERE DATE(trip_date) BETWEEN ? AND ?
+    WHERE trip_date BETWEEN ? AND ?
       AND toll_fee IS NOT NULL AND toll_fee > 0
 ");
 $stmtToll->execute([$dateFrom, $dateTo]);
