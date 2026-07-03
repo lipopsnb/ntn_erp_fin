@@ -329,7 +329,6 @@ class BkavEHoaDonClient
             . '</soap:Body>'
             . '</soap:Envelope>';
 
-        $isProduction = defined('BKAV_ENV') && BKAV_ENV === 'production';
         $ch = curl_init($this->wsUrl);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
@@ -342,8 +341,8 @@ class BkavEHoaDonClient
             ],
             CURLOPT_CONNECTTIMEOUT => (int)(defined('BKAV_TIMEOUT_CONNECT') ? BKAV_TIMEOUT_CONNECT : 10),
             CURLOPT_TIMEOUT        => (int)(defined('BKAV_TIMEOUT_READ')    ? BKAV_TIMEOUT_READ    : 60),
-            CURLOPT_SSL_VERIFYPEER => $isProduction,
-            CURLOPT_SSL_VERIFYHOST => $isProduction ? 2 : 0,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => 0,
         ]);
 
         $response = curl_exec($ch);
