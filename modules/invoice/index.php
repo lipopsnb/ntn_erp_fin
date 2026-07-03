@@ -469,6 +469,128 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
     </div>
 </div>
 
+<!-- ============ MODAL VAT BKAV ============ -->
+<div class="modal fade" id="modalVAT" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title">
+                    <i class="fas fa-file-invoice-dollar me-2"></i>Preview xuất hoá đơn VAT BKAV
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Thông tin HĐ nội bộ -->
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <span class="text-muted small">Số HĐ nội bộ:</span>
+                        <strong id="vatInvoiceNo" class="ms-1"></strong>
+                    </div>
+                    <div class="col-md-6">
+                        <span class="text-muted small">Ngày HĐ:</span>
+                        <strong id="vatInvoiceDate" class="ms-1"></strong>
+                    </div>
+                </div>
+                <!-- Seller -->
+                <div class="card border-0 bg-light mb-3">
+                    <div class="card-body py-2">
+                        <div class="fw-bold small text-uppercase text-muted mb-1">Người bán</div>
+                        <div><strong id="vatSellerName"></strong></div>
+                        <div class="small text-muted">MST: <span id="vatSellerTax"></span></div>
+                        <div class="small text-muted"><span id="vatSellerAddress"></span></div>
+                    </div>
+                </div>
+                <!-- Buyer -->
+                <div class="card border-0 bg-light mb-3">
+                    <div class="card-body py-2">
+                        <div class="fw-bold small text-uppercase text-muted mb-1">Người mua</div>
+                        <div><strong id="vatBuyerName"></strong> – <span id="vatBuyerUnit"></span></div>
+                        <div class="small text-muted"><span id="vatBuyerAddress"></span></div>
+                        <div class="small text-muted">MST: <span id="vatBuyerTax"></span></div>
+                        <div class="small text-muted">TK: <span id="vatBuyerBank"></span></div>
+                    </div>
+                </div>
+                <!-- Items -->
+                <div class="table-responsive mb-3">
+                    <table class="table table-bordered table-sm align-middle mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>#</th>
+                                <th>Tên hàng hoá / dịch vụ</th>
+                                <th class="text-center">ĐVT</th>
+                                <th class="text-end">Số lượng</th>
+                                <th class="text-end">Đơn giá</th>
+                                <th class="text-end">Thành tiền</th>
+                            </tr>
+                        </thead>
+                        <tbody id="vatItemsBody"></tbody>
+                    </table>
+                </div>
+                <!-- Tổng -->
+                <div class="d-flex flex-column align-items-end gap-1 mb-2">
+                    <div class="small">Tạm tính: <strong id="vatSubtotal"></strong></div>
+                    <div class="small">VAT (<span id="vatVatRate"></span>): <strong id="vatVatAmount"></strong></div>
+                    <div class="fs-6 fw-bold text-success">Tổng cộng: <span id="vatTotal"></span></div>
+                </div>
+                <div class="alert alert-light border py-2 small">
+                    <i class="fas fa-info-circle me-1 text-muted"></i>
+                    Bằng chữ: <em id="vatWords"></em>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i>Đóng
+                </button>
+                <button type="button" class="btn btn-warning" id="btnConfirmVAT"
+                        onclick="pushToBKAV(this.dataset.invId)">
+                    <i class="fas fa-paper-plane me-1"></i>Xác nhận xuất BKAV
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============ MODAL KHOÁ HOÁ ĐƠN ============ -->
+<div class="modal fade" id="modalLock" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-lock me-2"></i>Khoá hoá đơn
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning py-2 small mb-3">
+                    <i class="fas fa-exclamation-triangle me-1"></i>
+                    Sau khi khoá, hoá đơn <strong>chỉ giám đốc mới được sửa</strong>.
+                    Thông tin này sẽ được dùng để chuyển sang công nợ.
+                </div>
+                <input type="hidden" id="lockInvoiceId">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Số hoá đơn nội bộ</label>
+                    <input type="text" id="lockInvoiceNo" class="form-control bg-light" readonly>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Số hoá đơn BKAV <span class="text-danger">*</span></label>
+                    <input type="text" id="lockBkavNo" class="form-control" placeholder="Nhập số HĐ do BKAV cấp">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Ngày hoá đơn BKAV <span class="text-danger">*</span></label>
+                    <input type="date" id="lockBkavDate" class="form-control" value="<?= date('Y-m-d') ?>">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Huỷ</button>
+                <button type="button" class="btn btn-danger" id="btnConfirmLock">
+                    <i class="fas fa-lock me-1"></i>Xác nhận khoá
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
 <script>
 const CSRF_TOKEN = <?= json_encode($csrf) ?>;
 
@@ -884,126 +1006,4 @@ document.getElementById('btnConfirmLock')?.addEventListener('click', () => {
     });
 });
 </script>
-
-<!-- ============ MODAL VAT BKAV ============ -->
-<div class="modal fade" id="modalVAT" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-warning text-dark">
-                <h5 class="modal-title">
-                    <i class="fas fa-file-invoice-dollar me-2"></i>Preview xuất hoá đơn VAT BKAV
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <!-- Thông tin HĐ nội bộ -->
-                <div class="row g-2 mb-3">
-                    <div class="col-md-6">
-                        <span class="text-muted small">Số HĐ nội bộ:</span>
-                        <strong id="vatInvoiceNo" class="ms-1"></strong>
-                    </div>
-                    <div class="col-md-6">
-                        <span class="text-muted small">Ngày HĐ:</span>
-                        <strong id="vatInvoiceDate" class="ms-1"></strong>
-                    </div>
-                </div>
-                <!-- Seller -->
-                <div class="card border-0 bg-light mb-3">
-                    <div class="card-body py-2">
-                        <div class="fw-bold small text-uppercase text-muted mb-1">Người bán</div>
-                        <div><strong id="vatSellerName"></strong></div>
-                        <div class="small text-muted">MST: <span id="vatSellerTax"></span></div>
-                        <div class="small text-muted"><span id="vatSellerAddress"></span></div>
-                    </div>
-                </div>
-                <!-- Buyer -->
-                <div class="card border-0 bg-light mb-3">
-                    <div class="card-body py-2">
-                        <div class="fw-bold small text-uppercase text-muted mb-1">Người mua</div>
-                        <div><strong id="vatBuyerName"></strong> – <span id="vatBuyerUnit"></span></div>
-                        <div class="small text-muted"><span id="vatBuyerAddress"></span></div>
-                        <div class="small text-muted">MST: <span id="vatBuyerTax"></span></div>
-                        <div class="small text-muted">TK: <span id="vatBuyerBank"></span></div>
-                    </div>
-                </div>
-                <!-- Items -->
-                <div class="table-responsive mb-3">
-                    <table class="table table-bordered table-sm align-middle mb-0">
-                        <thead class="table-dark">
-                            <tr>
-                                <th>#</th>
-                                <th>Tên hàng hoá / dịch vụ</th>
-                                <th class="text-center">ĐVT</th>
-                                <th class="text-end">Số lượng</th>
-                                <th class="text-end">Đơn giá</th>
-                                <th class="text-end">Thành tiền</th>
-                            </tr>
-                        </thead>
-                        <tbody id="vatItemsBody"></tbody>
-                    </table>
-                </div>
-                <!-- Tổng -->
-                <div class="d-flex flex-column align-items-end gap-1 mb-2">
-                    <div class="small">Tạm tính: <strong id="vatSubtotal"></strong></div>
-                    <div class="small">VAT (<span id="vatVatRate"></span>): <strong id="vatVatAmount"></strong></div>
-                    <div class="fs-6 fw-bold text-success">Tổng cộng: <span id="vatTotal"></span></div>
-                </div>
-                <div class="alert alert-light border py-2 small">
-                    <i class="fas fa-info-circle me-1 text-muted"></i>
-                    Bằng chữ: <em id="vatWords"></em>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="fas fa-times me-1"></i>Đóng
-                </button>
-                <button type="button" class="btn btn-warning" id="btnConfirmVAT"
-                        onclick="pushToBKAV(this.dataset.invId)">
-                    <i class="fas fa-paper-plane me-1"></i>Xác nhận xuất BKAV
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- ============ MODAL KHOÁ HOÁ ĐƠN ============ -->
-<div class="modal fade" id="modalLock" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title">
-                    <i class="fas fa-lock me-2"></i>Khoá hoá đơn
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="alert alert-warning py-2 small mb-3">
-                    <i class="fas fa-exclamation-triangle me-1"></i>
-                    Sau khi khoá, hoá đơn <strong>chỉ giám đốc mới được sửa</strong>.
-                    Thông tin này sẽ được dùng để chuyển sang công nợ.
-                </div>
-                <input type="hidden" id="lockInvoiceId">
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Số hoá đơn nội bộ</label>
-                    <input type="text" id="lockInvoiceNo" class="form-control bg-light" readonly>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Số hoá đơn BKAV <span class="text-danger">*</span></label>
-                    <input type="text" id="lockBkavNo" class="form-control" placeholder="Nhập số HĐ do BKAV cấp">
-                </div>
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Ngày hoá đơn BKAV <span class="text-danger">*</span></label>
-                    <input type="date" id="lockBkavDate" class="form-control" value="<?= date('Y-m-d') ?>">
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Huỷ</button>
-                <button type="button" class="btn btn-danger" id="btnConfirmLock">
-                    <i class="fas fa-lock me-1"></i>Xác nhận khoá
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
 <?php include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/footer.php'; ?>
