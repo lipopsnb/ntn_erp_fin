@@ -5,7 +5,7 @@
 // ══════════════════════════════════════════════════════════════
 
 // ── Môi trường ────────────────────────────────────────────────
-define('BKAV_ENV', 'sandbox'); // 'sandbox' | 'production'
+define('BKAV_ENV', 'production'); // 'sandbox' | 'production'
 
 // ── URL Webservice ────────────────────────────────────────────
 define('BKAV_WS_URL',
