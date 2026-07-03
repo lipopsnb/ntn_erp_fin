@@ -51,8 +51,23 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
       <p class="text-muted mb-0">Tổng hợp lương, chuyên cần, OT, phòng ban</p>
     </div>
     <div class="d-flex gap-2 flex-wrap align-items-center">
-      <input type="date" id="dateFrom" class="form-control form-control-sm" value="<?= date('Y-m-01') ?>" style="width:140px;">
-      <input type="date" id="dateTo"   class="form-control form-control-sm" value="<?= date('Y-m-d') ?>"  style="width:140px;">
+      <select id="payrollMonth" class="form-select form-select-sm" style="width:120px;">
+        <?php
+        for ($m = 1; $m <= 12; $m++) {
+          $selected = ($m == (int)date('m')) ? 'selected' : '';
+          echo "<option value=\"$m\" $selected>Tháng $m</option>";
+        }
+        ?>
+      </select>
+      <select id="payrollYear" class="form-select form-select-sm" style="width:90px;">
+        <?php
+        $curYear = (int)date('Y');
+        for ($y = $curYear - 2; $y <= $curYear; $y++) {
+          $selected = ($y === $curYear) ? 'selected' : '';
+          echo "<option value=\"$y\" $selected>$y</option>";
+        }
+        ?>
+      </select>
       <button class="btn btn-primary btn-sm" onclick="loadAll()">
         <i class="fas fa-sync-alt me-1"></i>Làm mới
       </button>
@@ -350,10 +365,13 @@ function fmtH(n) {
 }
 
 function buildParams() {
-  return new URLSearchParams({
-    date_from: document.getElementById('dateFrom').value,
-    date_to:   document.getElementById('dateTo').value,
-  }).toString();
+  const month = document.getElementById('payrollMonth').value;
+  const year  = document.getElementById('payrollYear').value;
+  const mm    = String(month).padStart(2, '0');
+  const lastDay = new Date(parseInt(year, 10), parseInt(month, 10), 0).getDate();
+  const dateFrom = `${year}-${mm}-01`;
+  const dateTo   = `${year}-${mm}-${String(lastDay).padStart(2, '0')}`;
+  return new URLSearchParams({ date_from: dateFrom, date_to: dateTo }).toString();
 }
 
 const CHART_COLORS = ['#3B82F6','#22C55E','#FACC15','#EF4444','#8B5CF6','#F97316','#14B8A6','#EC4899','#94A3B8','#06B6D4'];

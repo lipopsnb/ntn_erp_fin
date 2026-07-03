@@ -4,7 +4,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/erp/config/auth.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/erp/config/functions.php';
 header('Content-Type: application/json; charset=utf-8');
 requireLogin();
-requireRole('director');
+requireRole('director', 'accountant', 'manager', 'warehouse');
 
 $pdo = getDBConnection();
 
@@ -130,6 +130,26 @@ $inactiveItems = $pdo->query("
     LIMIT 20
 ")->fetchAll();
 
+// ── Danh sách tất cả vật tư và tồn kho hiện tại ─────────────────────────
+$stockList = $pdo->query("
+    SELECT
+        wi.item_code,
+        wi.item_name,
+        wc.name AS category_name,
+        wi.unit,
+        wi.min_stock,
+        COALESCE(SUM(CASE WHEN wt.type='import' THEN wt.qty ELSE -wt.qty END), 0) AS current_stock,
+        COALESCE(SUM(CASE WHEN wt.type='import' THEN wt.qty ELSE 0 END), 0) AS total_import,
+        COALESCE(SUM(CASE WHEN wt.type='export' THEN wt.qty ELSE 0 END), 0) AS total_export,
+        MAX(wt.transacted_at) AS last_transaction
+    FROM wa_items wi
+    LEFT JOIN wa_categories wc ON wc.id = wi.category_id
+    LEFT JOIN wa_transactions wt ON wt.item_id = wi.id
+    WHERE wi.is_active = 1
+    GROUP BY wi.id
+    ORDER BY current_stock DESC, wi.item_name ASC
+")->fetchAll();
+
 echo json_encode([
     'ok'  => true,
     'kpi' => [
@@ -145,4 +165,5 @@ echo json_encode([
     'low_stock_list'  => $lowStockList,
     'old_finished'    => $oldFinished,
     'inactive_items'  => $inactiveItems,
+    'stock_list'      => $stockList,
 ], JSON_UNESCAPED_UNICODE);

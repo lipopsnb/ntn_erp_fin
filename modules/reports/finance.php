@@ -140,6 +140,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
             <i class="fas fa-file-invoice text-secondary"></i>
           </div>
         </div>
+
       </div>
     </div>
     <div class="col-6 col-md-4 col-lg-2">
@@ -193,6 +194,32 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
           <div class="fs-5 fw-bold text-primary" id="kpiHeadcountVal">—</div>
           <div class="mt-2 rounded-circle bg-primary bg-opacity-10 p-2 d-inline-block">
             <i class="fas fa-user-check text-primary"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI: Tồn kho vật tư -->
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-4 col-lg-2">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="text-muted small mb-1">Tổng tồn kho (qty)</div>
+          <div class="fs-5 fw-bold text-info" id="kpiInventoryQtyVal">—</div>
+          <div class="mt-2 rounded-circle bg-info bg-opacity-10 p-2 d-inline-block">
+            <i class="fas fa-boxes text-info"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="text-muted small mb-1">Số mặt hàng còn tồn</div>
+          <div class="fs-5 fw-bold text-secondary" id="kpiInventoryItemsVal">—</div>
+          <div class="mt-2 rounded-circle bg-secondary bg-opacity-10 p-2 d-inline-block">
+            <i class="fas fa-list text-secondary"></i>
           </div>
         </div>
       </div>
@@ -264,6 +291,28 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
         </table>
       </div>
     </div>
+
+    <!-- Top vật tư tồn nhiều -->
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-body">
+        <h6 class="card-title mb-3"><i class="fas fa-boxes me-2 text-info"></i>Top vật tư tồn kho nhiều nhất</h6>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>#</th>
+                <th>Tên vật tư</th>
+                <th>ĐVT</th>
+                <th class="text-end">Tồn hiện tại</th>
+              </tr>
+            </thead>
+            <tbody id="topInventoryBody">
+              <tr><td colspan="4" class="text-center text-muted py-3">Đang tải...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   </div>
 
 </div>
@@ -315,6 +364,14 @@ function loadAll() {
       document.getElementById('kpiSiCompanyVal').textContent    = fmt(k.payroll_si_company);
       document.getElementById('kpiPayrollNetVal').textContent   = fmt(k.payroll_net);
       document.getElementById('kpiHeadcountVal').textContent    = (k.payroll_headcount ?? 0) + ' NV';
+
+      // KPI tồn kho
+      if (document.getElementById('kpiInventoryQtyVal')) {
+        document.getElementById('kpiInventoryQtyVal').textContent = (parseFloat(k.inventory_total_qty) || 0).toLocaleString('vi-VN');
+      }
+      if (document.getElementById('kpiInventoryItemsVal')) {
+        document.getElementById('kpiInventoryItemsVal').textContent = (k.inventory_items ?? 0) + ' mặt hàng';
+      }
 
       // ── Chart: Doanh thu / Chi phí lương / Chi phí hành chính 12 tháng ──
       // Gộp tất cả labels từ 3 bộ dữ liệu
@@ -449,6 +506,21 @@ function loadAll() {
             <td>${badge}</td>
           </tr>`;
         }).join('');
+      }
+
+      // Bảng top tồn kho
+      const invBody = document.getElementById('topInventoryBody');
+      if (invBody) {
+        if (!d.top_inventory || !d.top_inventory.length) {
+          invBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">Không có dữ liệu tồn kho</td></tr>';
+        } else {
+          invBody.innerHTML = d.top_inventory.map((r, i) => `<tr>
+            <td>${i + 1}</td>
+            <td class="fw-semibold">${esc(r.item_name)}</td>
+            <td>${esc(r.unit || '—')}</td>
+            <td class="text-end fw-bold text-primary">${(parseFloat(r.remaining) || 0).toLocaleString('vi-VN')}</td>
+          </tr>`).join('');
+        }
       }
     })
     .catch(() => {});

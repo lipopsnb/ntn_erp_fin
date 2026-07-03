@@ -138,6 +138,42 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
     </div>
   </div>
 
+  <!-- Bảng danh sách tất cả vật tư tồn kho -->
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="card-title mb-0">
+          <i class="fas fa-list-alt me-2 text-primary"></i>Danh sách tồn kho vật tư
+        </h6>
+        <div class="d-flex gap-2 align-items-center">
+          <input type="text" id="stockSearch" class="form-control form-control-sm" placeholder="Tìm mặt hàng..." style="width:200px;" oninput="filterStockTable()">
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0" id="stockTable">
+          <thead class="table-dark">
+            <tr>
+              <th>#</th>
+              <th>Mã hàng</th>
+              <th>Tên vật tư</th>
+              <th>Danh mục</th>
+              <th>ĐVT</th>
+              <th class="text-end">Tổng nhập</th>
+              <th class="text-end">Tổng xuất</th>
+              <th class="text-end">Tồn hiện tại</th>
+              <th class="text-end">Min tồn kho</th>
+              <th>Giao dịch cuối</th>
+              <th>Trạng thái</th>
+            </tr>
+          </thead>
+          <tbody id="stockTableBody">
+            <tr><td colspan="11" class="text-center text-muted py-3">Đang tải...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
 </div>
 </div>
 
@@ -145,9 +181,60 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
 <script>
 let chartDailyInstance = null;
 let chartStockInstance = null;
+let allStockData = [];
 
 function esc(s) {
   return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function renderStockTable(data) {
+  const tbody = document.getElementById('stockTableBody');
+  if (!data || !data.length) {
+    tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-3">Không có dữ liệu</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map((r, i) => {
+    const cur = parseFloat(r.current_stock) || 0;
+    const min = parseFloat(r.min_stock) || 0;
+    let statusBadge = '';
+    if (cur <= 0) {
+      statusBadge = '<span class="badge bg-danger">Hết hàng</span>';
+    } else if (min > 0 && cur < min) {
+      statusBadge = '<span class="badge bg-warning text-dark">Sắp hết</span>';
+    } else {
+      statusBadge = '<span class="badge bg-success">Còn hàng</span>';
+    }
+    const lastTx = r.last_transaction ? esc(r.last_transaction.substring(0, 10)) : '<span class="text-muted">Chưa GD</span>';
+    const totalImport = parseFloat(r.total_import) || 0;
+    const totalExport = parseFloat(r.total_export) || 0;
+    return `<tr>
+      <td>${i + 1}</td>
+      <td><code>${esc(r.item_code || '—')}</code></td>
+      <td class="fw-semibold">${esc(r.item_name)}</td>
+      <td><span class="badge bg-secondary bg-opacity-25 text-dark">${esc(r.category_name || 'Chưa phân loại')}</span></td>
+      <td>${esc(r.unit || '—')}</td>
+      <td class="text-end text-success">${totalImport.toLocaleString('vi-VN')}</td>
+      <td class="text-end text-danger">${totalExport.toLocaleString('vi-VN')}</td>
+      <td class="text-end fw-bold ${cur <= 0 ? 'text-danger' : cur < min && min > 0 ? 'text-warning' : 'text-primary'}">${cur.toLocaleString('vi-VN')}</td>
+      <td class="text-end text-muted">${min > 0 ? min.toLocaleString('vi-VN') : '—'}</td>
+      <td>${lastTx}</td>
+      <td>${statusBadge}</td>
+    </tr>`;
+  }).join('');
+}
+
+function filterStockTable() {
+  const q = document.getElementById('stockSearch').value.toLowerCase();
+  if (!q) {
+    renderStockTable(allStockData);
+    return;
+  }
+  const filtered = allStockData.filter(r =>
+    (r.item_name || '').toLowerCase().includes(q) ||
+    (r.item_code || '').toLowerCase().includes(q) ||
+    (r.category_name || '').toLowerCase().includes(q)
+  );
+  renderStockTable(filtered);
 }
 
 function loadAll() {
@@ -241,6 +328,10 @@ function loadAll() {
           </div>`
         ).join('');
       }
+
+      // Render bảng tồn kho đầy đủ
+      allStockData = d.stock_list || [];
+      renderStockTable(allStockData);
     })
     .catch(() => {});
 }

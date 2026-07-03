@@ -10,6 +10,12 @@ $pdo = getDBConnection();
 
 $dateFrom = $_GET['date_from'] ?? date('Y-m-01');
 $dateTo   = $_GET['date_to']   ?? date('Y-m-d');
+$filterTs = strtotime($dateFrom);
+if ($filterTs === false) {
+    $filterTs = time();
+}
+$filterYear  = (int)date('Y', $filterTs);
+$filterMonth = (int)date('m', $filterTs);
 
 // ── KPI: Nhân sự ──────────────────────────────────────────────────────────
 $totalActive  = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE is_active = 1")->fetchColumn();
@@ -49,10 +55,10 @@ $stmtPayroll = $pdo->prepare("
     FROM payroll_slips ps
     JOIN payroll_periods pp ON pp.id = ps.period_id
     WHERE pp.status IN ('approved','locked')
-      AND pp.period_from <= ?
-      AND pp.period_to   >= ?
+      AND pp.period_year = ?
+      AND pp.period_month = ?
 ");
-$stmtPayroll->execute([$dateTo, $dateFrom]);
+$stmtPayroll->execute([$filterYear, $filterMonth]);
 $kpi = $stmtPayroll->fetch(PDO::FETCH_ASSOC) ?: [];
 
 // ── Bảng lương theo phòng ban ─────────────────────────────────────────────
@@ -73,12 +79,12 @@ $byDept = $pdo->prepare("
     JOIN users u ON u.id = ps.user_id
     LEFT JOIN departments d ON d.id = u.department_id
     WHERE pp.status IN ('approved','locked')
-      AND pp.period_from <= ?
-      AND pp.period_to   >= ?
+      AND pp.period_year = ?
+      AND pp.period_month = ?
     GROUP BY d.id
     ORDER BY tong_chi_phi DESC
 ");
-$byDept->execute([$dateTo, $dateFrom]);
+$byDept->execute([$filterYear, $filterMonth]);
 $deptRows = $byDept->fetchAll();
 
 // ── Biểu đồ: Chi phí lương 12 tháng gần nhất ────────────────────────────
@@ -91,7 +97,8 @@ $chartPayroll12 = $pdo->query("
     FROM payroll_slips ps
     JOIN payroll_periods pp ON pp.id = ps.period_id
     WHERE pp.status IN ('approved','locked')
-      AND pp.period_from >= DATE_SUB(CURDATE(), INTERVAL 11 MONTH)
+      AND (pp.period_year * 100 + pp.period_month) >=
+          (YEAR(DATE_SUB(CURDATE(), INTERVAL 11 MONTH)) * 100 + MONTH(DATE_SUB(CURDATE(), INTERVAL 11 MONTH)))
     GROUP BY pp.period_year, pp.period_month
     ORDER BY month ASC
 ")->fetchAll();
