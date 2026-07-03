@@ -179,6 +179,9 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                                 <a href="/erp/api/master/download_price_template.php" class="btn btn-outline-secondary" target="_blank">
                                     <i class="fas fa-download me-1"></i>Tải file mẫu
                                 </a>
+                                <a href="/erp/api/master/export_quotation.php?customer_id=<?= (int)$customer['id'] ?>" class="btn btn-outline-primary" target="_blank">
+                                    <i class="fas fa-file-invoice me-1"></i>Tạo báo giá
+                                </a>
                             </div>
                             <?php endif; ?>
 
