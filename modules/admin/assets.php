@@ -56,6 +56,21 @@ $isValidDate = static function (?string $value): bool {
     return $date !== false && $date->format('Y-m-d') === $value;
 };
 
+$calculateDepreciationPerMonth = static function (array $asset): ?float {
+    $depreciationYears = isset($asset['depreciation_years']) ? (float)$asset['depreciation_years'] : 0;
+    $purchasePrice = isset($asset['purchase_price']) ? (float)$asset['purchase_price'] : 0;
+    $startDate = $asset['depreciation_start_date'] ?? ($asset['purchase_date'] ?? null);
+    if ($depreciationYears <= 0 || $purchasePrice <= 0) {
+        return null;
+    }
+    if ($startDate && $startDate > date('Y-m-d')) {
+        return null;
+    }
+
+    $depreciableValue = max(0, $purchasePrice - (float)($asset['salvage_value'] ?? 0));
+    return round($depreciableValue / ($depreciationYears * 12));
+};
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ensurePostCsrf();
     $action = trim($_POST['action'] ?? '');
@@ -69,6 +84,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $purchasePrice = trim($_POST['purchase_price'] ?? '') !== '' ? (float)$_POST['purchase_price'] : 0;
         $supplier = trim($_POST['supplier'] ?? '') ?: null;
         $location = trim($_POST['location'] ?? '') ?: null;
+        $depreciationYears = trim($_POST['depreciation_years'] ?? '') !== '' ? (float)$_POST['depreciation_years'] : null;
+        $salvageValue = (float)($_POST['salvage_value'] ?? 0);
+        $depreciationStartDate = trim($_POST['depreciation_start_date'] ?? '') ?: ($purchaseDate ?: null);
         $status = trim($_POST['status'] ?? 'active');
         $note = trim($_POST['note'] ?? '') ?: null;
 
@@ -93,6 +111,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($purchasePrice < 0) {
             $errors[] = 'Giá mua không được âm.';
         }
+        if ($depreciationYears !== null && $depreciationYears <= 0) {
+            $errors[] = 'Thời gian khấu hao phải lớn hơn 0.';
+        }
+        if ($salvageValue < 0) {
+            $errors[] = 'Giá trị còn lại không được âm.';
+        }
+        if ($purchasePrice > 0 && $salvageValue > $purchasePrice) {
+            $errors[] = 'Giá trị còn lại không được lớn hơn giá mua.';
+        }
+        if ($depreciationStartDate !== null && !$isValidDate($depreciationStartDate)) {
+            $errors[] = 'Ngày bắt đầu khấu hao không hợp lệ.';
+        }
 
         $existingAsset = null;
         if ($action === 'edit') {
@@ -112,15 +142,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($action === 'edit') {
                     $stmt = $pdo->prepare("UPDATE company_assets
                         SET asset_code = ?, asset_name = ?, category = ?, purchase_date = ?, purchase_price = ?, supplier = ?,
-                            location = ?, status = ?, note = ?, updated_at = CURRENT_TIMESTAMP
+                            location = ?, depreciation_years = ?, salvage_value = ?, depreciation_start_date = ?, status = ?, note = ?,
+                            updated_at = CURRENT_TIMESTAMP
                         WHERE id = ?");
-                    $stmt->execute([$assetCode, $assetName, $category, $purchaseDate, $purchasePrice, $supplier, $location, $status, $note, $id]);
+                    $stmt->execute([$assetCode, $assetName, $category, $purchaseDate, $purchasePrice, $supplier, $location, $depreciationYears, $salvageValue, $depreciationStartDate, $status, $note, $id]);
                     setFlash('success', 'Đã cập nhật tài sản.');
                 } else {
                     $stmt = $pdo->prepare("INSERT INTO company_assets
-                        (asset_code, asset_name, category, purchase_date, purchase_price, supplier, location, status, note, created_by)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                    $stmt->execute([$assetCode, $assetName, $category, $purchaseDate, $purchasePrice, $supplier, $location, $status, $note, currentUserId()]);
+                        (asset_code, asset_name, category, purchase_date, purchase_price, supplier, location, depreciation_years, salvage_value, depreciation_start_date, status, note, created_by)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                    $stmt->execute([$assetCode, $assetName, $category, $purchaseDate, $purchasePrice, $supplier, $location, $depreciationYears, $salvageValue, $depreciationStartDate, $status, $note, currentUserId()]);
                     setFlash('success', 'Đã thêm tài sản mới.');
                 }
                 clearOldInput();
@@ -224,6 +255,9 @@ $formValues = [
     'purchase_price' => isset($editAsset['purchase_price']) ? (string)(float)$editAsset['purchase_price'] : '',
     'supplier' => $editAsset['supplier'] ?? '',
     'location' => $editAsset['location'] ?? '',
+    'depreciation_years' => isset($editAsset['depreciation_years']) && $editAsset['depreciation_years'] !== null ? (string)(float)$editAsset['depreciation_years'] : '',
+    'salvage_value' => isset($editAsset['salvage_value']) ? (string)(float)$editAsset['salvage_value'] : '0',
+    'depreciation_start_date' => $editAsset['depreciation_start_date'] ?? ($editAsset['purchase_date'] ?? ''),
     'status' => $editAsset['status'] ?? 'active',
     'note' => $editAsset['note'] ?? '',
 ];
@@ -268,6 +302,20 @@ $stats = fetchOneSafe(
      WHERE " . implode(' AND ', $statsWhere),
     $params
 ) ?: ['total_assets' => 0, 'active_assets' => 0, 'assigned_assets' => 0, 'maintenance_assets' => 0];
+$totalDeprMonth = (float)$pdo->query("
+    SELECT COALESCE(SUM(
+        GREATEST(purchase_price - COALESCE(salvage_value, 0), 0) / (depreciation_years * 12)
+    ), 0)
+    FROM company_assets
+    WHERE depreciation_years > 0
+      AND depreciation_years IS NOT NULL
+      AND purchase_price > 0
+      AND status NOT IN ('disposed')
+      AND (
+            COALESCE(depreciation_start_date, purchase_date) IS NULL
+            OR COALESCE(depreciation_start_date, purchase_date) <= CURDATE()
+      )
+")->fetchColumn();
 $employees = fetchAllSafe($pdo, 'SELECT id, full_name, username FROM users WHERE is_active = 1 ORDER BY full_name');
 $assignmentsByAsset = [];
 $assetIds = array_column($assets, 'id');
@@ -335,6 +383,10 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                             <div class="col-md-4"><label class="form-label fw-semibold">Nhà cung cấp</label><input type="text" name="supplier" class="form-control" value="<?= e($formValues['supplier']) ?>"></div>
                             <div class="col-md-4"><label class="form-label fw-semibold">Vị trí</label><input type="text" name="location" class="form-control" value="<?= e($formValues['location']) ?>"></div>
                             <div class="col-md-4"><label class="form-label fw-semibold">Trạng thái</label><select name="status" class="form-select"><?php foreach ($statusMap as $value => $meta): ?><?php if ($value === 'assigned') continue; ?><option value="<?= e($value) ?>" <?= $formValues['status'] === $value ? 'selected' : '' ?>><?= e($meta[1]) ?></option><?php endforeach; ?></select></div>
+                            <div class="col-12"><div class="border-top pt-3 mt-1"><h6 class="mb-3 text-warning"><i class="fas fa-chart-line me-2"></i>Khấu hao tài sản</h6></div></div>
+                            <div class="col-md-4"><label class="form-label fw-semibold">Thời gian khấu hao (năm)</label><input type="number" name="depreciation_years" class="form-control text-end" min="0" step="0.01" placeholder="VD: 5" value="<?= e($formValues['depreciation_years']) ?>"></div>
+                            <div class="col-md-4"><label class="form-label fw-semibold">Giá trị còn lại</label><input type="number" name="salvage_value" class="form-control text-end" min="0" step="0.01" value="<?= e($formValues['salvage_value']) ?>"></div>
+                            <div class="col-md-4"><label class="form-label fw-semibold">Ngày bắt đầu khấu hao</label><input type="date" name="depreciation_start_date" class="form-control" value="<?= e($formValues['depreciation_start_date'] ?: $formValues['purchase_date']) ?>"><div class="form-text">Để trống sẽ mặc định theo ngày mua.</div></div>
                             <div class="col-12"><label class="form-label fw-semibold">Ghi chú</label><textarea name="note" class="form-control" rows="2"><?= e($formValues['note']) ?></textarea></div>
                         </div>
                         <div class="mt-3 d-flex gap-2">
@@ -361,6 +413,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
             <div class="col-md-3"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="text-muted small mb-1">Đang dùng</div><h4 class="mb-0 text-success"><?= (int)$stats['active_assets'] ?></h4></div></div></div>
             <div class="col-md-3"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="text-muted small mb-1">Đã cấp phát</div><h4 class="mb-0 text-primary"><?= (int)$stats['assigned_assets'] ?></h4></div></div></div>
             <div class="col-md-3"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="text-muted small mb-1">Bảo dưỡng</div><h4 class="mb-0 text-warning"><?= (int)$stats['maintenance_assets'] ?></h4></div></div></div>
+            <div class="col-md-3"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="text-muted small mb-1">Khấu hao tháng hiện tại</div><h4 class="mb-0 text-warning"><?= e(formatCurrency($totalDeprMonth)) ?></h4></div></div></div>
         </div>
 
         <div class="card border-0 shadow-sm">
@@ -368,21 +421,23 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                 <table class="table table-hover align-middle mb-0">
                     <thead class="table-dark">
                         <tr>
-                            <th>Mã TS</th><th>Tên</th><th>Loại</th><th>Ngày mua</th><th class="text-end">Giá mua</th><th>Vị trí</th><th>Trạng thái</th><th>Thao tác</th>
+                            <th>Mã TS</th><th>Tên</th><th>Loại</th><th>Ngày mua</th><th class="text-end">Giá mua</th><th class="text-end">Khấu hao/tháng</th><th>Vị trí</th><th>Trạng thái</th><th>Thao tác</th>
                         </tr>
                     </thead>
                     <tbody>
                     <?php if (!$assets): ?>
-                        <tr><td colspan="8" class="text-center text-muted py-4">Chưa có tài sản nào.</td></tr>
+                        <tr><td colspan="9" class="text-center text-muted py-4">Chưa có tài sản nào.</td></tr>
                     <?php else: ?>
                         <?php foreach ($assets as $asset): ?>
                             <?php [$badgeClass, $statusLabel] = $statusMap[$asset['status']] ?? ['secondary', $asset['status']]; ?>
+                            <?php $deprMonth = $calculateDepreciationPerMonth($asset); ?>
                             <tr>
                                 <td class="fw-semibold text-primary"><?= e($asset['asset_code']) ?></td>
                                 <td><div class="fw-semibold"><?= e($asset['asset_name']) ?></div><div class="small text-muted"><?= e($asset['supplier'] ?: '—') ?></div></td>
                                 <td><?= e($categoryMap[$asset['category']] ?? $asset['category']) ?></td>
                                 <td><?= e(formatDate($asset['purchase_date'])) ?></td>
                                 <td class="text-end"><?= e(formatCurrency($asset['purchase_price'])) ?></td>
+                                <td class="text-end"><?= $deprMonth !== null ? e(number_format($deprMonth, 0, ',', '.') . ' đ/tháng') : '—' ?></td>
                                 <td><?= e($asset['location'] ?: '—') ?></td>
                                 <td><span class="badge bg-<?= $badgeClass ?>"><?= e($statusLabel) ?></span><?php if (!empty($asset['current_user_name'])): ?><div class="small text-muted mt-1"><?= e($asset['current_user_name']) ?></div><?php endif; ?></td>
                                 <td>
@@ -413,7 +468,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                             </tr>
                             <?php if (!empty($assignmentsByAsset[(int)$asset['id']])): ?>
                                 <tr class="collapse" id="asset-history-<?= (int)$asset['id'] ?>">
-                                    <td colspan="8" class="bg-light">
+                                    <td colspan="9" class="bg-light">
                                         <div class="table-responsive">
                                             <table class="table table-sm mb-0">
                                                 <thead><tr><th>Nhân viên</th><th>Ngày cấp</th><th>Ngày thu hồi</th><th>Ghi chú</th></tr></thead>

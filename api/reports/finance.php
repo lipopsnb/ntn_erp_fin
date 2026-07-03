@@ -15,6 +15,8 @@ function fmtAmount(float $n): string {
     return number_format($n, 0, ',', '.') . ' đ';
 }
 
+const AVERAGE_DAYS_PER_MONTH = 30.4375;
+
 // ── KPI: Doanh thu theo kỳ ───────────────────────────────────────────────
 $stmtRev = $pdo->prepare("
     SELECT COALESCE(SUM(total_amount), 0)
@@ -25,7 +27,7 @@ $stmtRev = $pdo->prepare("
 $stmtRev->execute([$dateFrom, $dateTo]);
 $revenue = (float)$stmtRev->fetchColumn();
 
-// ── KPI: Chi phí hành chính (expense_requests) ────────────────────────────
+// ── KPI: Chi phí hành chính nền (expense_requests) ───────────────────────
 $stmtExp = $pdo->prepare("
     SELECT COALESCE(SUM(amount), 0)
     FROM expense_requests
@@ -33,7 +35,55 @@ $stmtExp = $pdo->prepare("
       AND DATE(COALESCE(expense_date, created_at)) BETWEEN ? AND ?
 ");
 $stmtExp->execute([$dateFrom, $dateTo]);
-$expenseAdmin = (float)$stmtExp->fetchColumn();
+$expenseAdminBase = (float)$stmtExp->fetchColumn();
+
+$dateFromObj = new DateTime($dateFrom);
+$dateToObj = new DateTime($dateTo);
+$daysDiff = (int)$dateFromObj->diff($dateToObj)->days + 1;
+// AVERAGE_DAYS_PER_MONTH = số ngày trung bình mỗi tháng (365.25 / 12), dùng để quy đổi khoảng ngày sang phần tháng.
+$monthFraction = $daysDiff / AVERAGE_DAYS_PER_MONTH;
+
+$stmtDepr = $pdo->prepare("
+    SELECT COALESCE(SUM(
+        GREATEST(purchase_price - COALESCE(salvage_value, 0), 0) / (depreciation_years * 12)
+    ), 0) AS monthly_depr
+    FROM company_assets
+    WHERE depreciation_years > 0
+      AND depreciation_years IS NOT NULL
+      AND purchase_price > 0
+      AND status NOT IN ('disposed')
+      AND (
+            COALESCE(depreciation_start_date, purchase_date) IS NULL
+            OR COALESCE(depreciation_start_date, purchase_date) <= ?
+      )
+");
+$stmtDepr->execute([$dateTo]);
+$deprPerMonth = (float)$stmtDepr->fetchColumn();
+$expenseDepr = round($deprPerMonth * $monthFraction);
+
+$stmtFuel = $pdo->prepare("
+    SELECT COALESCE(SUM(amount), 0) FROM vehicle_fuel
+    WHERE fuel_date BETWEEN ? AND ?
+");
+$stmtFuel->execute([$dateFrom, $dateTo]);
+$expenseFuel = (float)$stmtFuel->fetchColumn();
+
+$stmtMaint = $pdo->prepare("
+    SELECT COALESCE(SUM(amount), 0) FROM vehicle_maintenance
+    WHERE maintenance_date BETWEEN ? AND ?
+");
+$stmtMaint->execute([$dateFrom, $dateTo]);
+$expenseMaintenance = (float)$stmtMaint->fetchColumn();
+
+$stmtToll = $pdo->prepare("
+    SELECT COALESCE(SUM(toll_fee), 0) FROM vehicle_trips
+    WHERE trip_date BETWEEN ? AND ?
+      AND toll_fee IS NOT NULL AND toll_fee > 0
+");
+$stmtToll->execute([$dateFrom, $dateTo]);
+$expenseToll = (float)$stmtToll->fetchColumn();
+
+$expenseVehicle = $expenseFuel + $expenseMaintenance + $expenseToll;
 
 // ── KPI: Chi phí lương (payroll_slips) ────────────────────────────────────
 // Chi phí lương thực tế = gross_salary + si_company (BHXH DN đóng thêm 21.5%)
@@ -64,6 +114,7 @@ $payrollNet       = (float)($payrollRow['tong_net']            ?? 0);
 $payrollOT        = (float)($payrollRow['tong_ot']             ?? 0);
 $payrollHeadcount = (int)  ($payrollRow['so_nhan_vien']        ?? 0);
 
+$expenseAdmin = $expenseAdminBase + $expenseDepr + $expenseVehicle;
 $expenseTotal = $expenseAdmin + $expensePayroll;
 $profit       = $revenue - $expenseTotal;
 
@@ -206,8 +257,14 @@ echo json_encode([
     'kpi' => [
         'revenue'              => $revenue,
         'revenue_fmt'          => fmtAmount($revenue),
+        'expense_admin_base'   => $expenseAdminBase,
         'expense_admin'        => $expenseAdmin,
         'expense_admin_fmt'    => fmtAmount($expenseAdmin),
+        'expense_depr'         => $expenseDepr,
+        'expense_vehicle'      => $expenseVehicle,
+        'expense_fuel'         => $expenseFuel,
+        'expense_maintenance'  => $expenseMaintenance,
+        'expense_toll'         => $expenseToll,
         'expense_payroll'      => $expensePayroll,
         'expense_payroll_fmt'  => fmtAmount($expensePayroll),
         'expense_total'        => $expenseTotal,
