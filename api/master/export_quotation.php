@@ -84,9 +84,11 @@ try {
     // Bỏ qua nếu bảng chưa có hoặc thiếu cột
 }
 
-$documentDate = date('Ymd');
-$displayDate = date('d/m/Y');
+$now = new DateTimeImmutable('now', new DateTimeZone(date_default_timezone_get()));
+$documentDate = $now->format('Ymd');
+$displayDate = $now->format('d/m/Y');
 $customerCode = trim((string)($customer['customer_code'] ?? '')) ?: (string)$customer['id'];
+$safeCustomerCode = preg_replace('/[^A-Za-z0-9_-]+/', '_', $customerCode) ?: (string)$customer['id'];
 $quotationNo = 'QT-' . $customerCode . '-' . $documentDate;
 $companyContactParts = [];
 if ($companyTax !== '') {
@@ -171,6 +173,7 @@ $sheet->getStyle('A12:I12')->applyFromArray($headerStyle);
 
 $row = 13;
 foreach ($currentPrices as $idx => $priceRow) {
+    $amountFormula = sprintf('=IF(OR(E%d="",G%d=""),"",E%d*G%d)', $row, $row, $row, $row);
     $sheet->setCellValue("A{$row}", $idx + 1);
     $sheet->setCellValue("B{$row}", $priceRow['product_code'] ?? '');
     $sheet->setCellValue("C{$row}", $priceRow['description'] ?? '');
@@ -178,7 +181,7 @@ foreach ($currentPrices as $idx => $priceRow) {
     $sheet->setCellValue("E{$row}", '');
     $sheet->setCellValue("F{$row}", '');
     $sheet->setCellValue("G{$row}", (float)($priceRow['unit_price'] ?? 0));
-    $sheet->setCellValue("H{$row}", '=IF(OR(E' . $row . '="",G' . $row . '=""),"",E' . $row . '*G' . $row . ')');
+    $sheet->setCellValue("H{$row}", $amountFormula);
     $sheet->setCellValue("I{$row}", '');
 
     $sheet->getStyle("A{$row}:I{$row}")->applyFromArray($bodyBorder);
@@ -208,7 +211,7 @@ $sheet->getPageSetup()->setFitToWidth(1);
 $sheet->getPageSetup()->setFitToHeight(0);
 $sheet->getPageMargins()->setTop(0.5)->setRight(0.35)->setLeft(0.35)->setBottom(0.5);
 
-$filename = 'Quotation_' . $customerCode . '_' . $documentDate . '.xlsx';
+$filename = 'Quotation_' . $safeCustomerCode . '_' . $documentDate . '.xlsx';
 
 header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 header('Content-Disposition: attachment; filename="' . $filename . '"');
