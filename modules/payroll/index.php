@@ -213,9 +213,13 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                     ];
                     [$sCls, $sLbl] = $statusMap[$p['status']] ?? ['secondary', '?'];
                 ?>
-                <tr>
+                <tr style="cursor:pointer;" onclick="window.location='/erp/modules/payroll/slip_list.php?period_id=<?= $p['id'] ?>'">
                     <td class="fw-bold">
-                        Tháng <?= $p['period_month'] ?>/<?= $p['period_year'] ?>
+                        <a href="/erp/modules/payroll/slip_list.php?period_id=<?= $p['id'] ?>"
+                           class="text-decoration-none text-primary"
+                           onclick="event.stopPropagation()">
+                            Tháng <?= $p['period_month'] ?>/<?= $p['period_year'] ?>
+                        </a>
                     </td>
                     <td><?= date('d/m/Y', strtotime($p['period_from'])) ?></td>
                     <td><?= date('d/m/Y', strtotime($p['period_to'])) ?></td>
@@ -235,14 +239,8 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                     <td class="small text-muted">
                         <?= htmlspecialchars($p['created_name'] ?? '') ?>
                     </td>
-                    <td class="text-center">
+                    <td class="text-center" onclick="event.stopPropagation()">
                         <div class="d-flex gap-1 justify-content-center flex-wrap">
-
-                            <!-- Xem danh sách phiếu -->
-                            <a href="/erp/modules/payroll/slip_list.php?period_id=<?= $p['id'] ?>"
-                               class="btn btn-sm btn-outline-primary" title="Xem phiếu lương">
-                                <i class="fas fa-list"></i>
-                            </a>
 
                             <!-- Tính lại lương (trừ khi locked) -->
                             <?php if ($p['status'] !== 'locked'): ?>
@@ -276,7 +274,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                             <?php if ($p['status'] === 'submitted' && hasRole('director')): ?>
                             <button class="btn btn-sm btn-success"
                                     onclick="doWorkflow(<?= $p['id'] ?>, 'approve', this)"
-                                    title="Duyệt - NV sẽ thấy phiếu lương">
+                                    title="Duyệt - NV sẽ thấy phiếu lương sau khi duyệt">
                                 <i class="fas fa-check"></i>
                             </button>
                             <?php endif; ?>
@@ -302,7 +300,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                             <!-- Xoá kỳ lương - chỉ GĐ, không được xoá khi locked -->
                             <?php if (hasRole('director') && $p['status'] !== 'locked'): ?>
                             <form method="POST" class="d-inline"
-                                  onsubmit="return confirm('⚠️ Xoá kỳ lương Tháng <?= $p['period_month'] ?>/<?= $p['period_year'] ?>?\n\nToàn bộ <?= $p['slip_count'] ?> phiếu lương sẽ bị xoá vĩnh viễn!\nHành động này không thể hoàn tác!')">
+                                  onsubmit="return confirm('⚠️ Xoá kỳ lương Tháng <?= $p['period_month'] ?>/<?= $p['period_year'] ?>?\n\nToàn bộ <?= $p['slip_count'] ?> phiếu lương sẽ bị xoá vĩnh viễn!');">
                                 <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
                                 <input type="hidden" name="action"    value="delete_period">
                                 <input type="hidden" name="period_id" value="<?= $p['id'] ?>">
