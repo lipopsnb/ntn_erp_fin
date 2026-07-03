@@ -8,6 +8,7 @@ requireRole('director', 'accountant', 'manager');
 $pdo = getDBConnection();
 $user = currentUser();
 $canApprove = hasRole('director');
+$canManageCategories = hasRole('director', 'accountant');
 $canViewHistory = hasRole('director', 'accountant', 'manager');
 $canRecordPayment = hasRole('director', 'accountant', 'manager');
 $errors = [];
@@ -15,13 +16,24 @@ $oldInputWasFlashed = false;
 $paymentTolerance = 0.001; // tránh lỗi làm tròn số thực khi so sánh số tiền còn lại
 
 $categories = getExpenseCategories($pdo);
+$allCategories = fetchAllSafe(
+    $pdo,
+    "SELECT ec.id, ec.category_name, ec.is_active, COUNT(er.id) AS usage_count
+     FROM expense_categories ec
+     LEFT JOIN expense_requests er ON er.category_id = ec.id
+     GROUP BY ec.id, ec.category_name, ec.is_active
+     ORDER BY ec.is_active DESC, ec.category_name ASC"
+);
 $categoryIds = array_map(static fn(array $row): int => (int)$row['id'], $categories);
 $filterMonth = preg_match('/^\d{4}-\d{2}$/', $_GET['month'] ?? '') ? $_GET['month'] : date('Y-m');
 $filterCategory = (int)($_GET['category_id'] ?? 0);
 $filterStatus = trim($_GET['status'] ?? '');
-$allowedTabs = ['mine', 'pending', 'history'];
+$allowedTabs = ['mine', 'pending', 'history', 'categories'];
 $activeTab = in_array($_GET['tab'] ?? 'mine', $allowedTabs, true) ? (string)($_GET['tab'] ?? 'mine') : 'mine';
 if ($activeTab === 'pending' && !$canApprove) {
+    $activeTab = 'mine';
+}
+if ($activeTab === 'categories' && !$canManageCategories) {
     $activeTab = 'mine';
 }
 
@@ -78,6 +90,68 @@ $findExpense = static function (int $expenseId) use ($pdo): ?array {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ensurePostCsrf();
     $action = trim($_POST['action'] ?? '');
+
+    if ($action === 'create_category') {
+        if (!$canManageCategories) {
+            setFlash('danger', 'Bạn không có quyền thực hiện thao tác này.');
+            redirect($expensePageUrl(['tab' => 'mine']));
+        }
+
+        $catName = trim($_POST['category_name'] ?? '');
+        if ($catName === '') {
+            setFlash('danger', 'Tên loại chi phí không được để trống.');
+        } else {
+            $exists = $pdo->prepare('SELECT COUNT(*) FROM expense_categories WHERE category_name = ?');
+            $exists->execute([$catName]);
+            if ((int)$exists->fetchColumn() > 0) {
+                setFlash('danger', 'Loại chi phí "' . e($catName) . '" đã tồn tại.');
+            } else {
+                $pdo->prepare('INSERT INTO expense_categories (category_name, is_active) VALUES (?, 1)')
+                    ->execute([$catName]);
+                setFlash('success', 'Đã thêm loại chi phí: ' . e($catName));
+            }
+        }
+        redirect($expensePageUrl(['tab' => 'categories']));
+    }
+
+    if ($action === 'edit_category') {
+        if (!$canManageCategories) {
+            setFlash('danger', 'Bạn không có quyền thực hiện thao tác này.');
+            redirect($expensePageUrl(['tab' => 'categories']));
+        }
+
+        $catId = (int)($_POST['category_id'] ?? 0);
+        $catName = trim($_POST['category_name'] ?? '');
+        if ($catId <= 0 || $catName === '') {
+            setFlash('danger', 'Dữ liệu không hợp lệ.');
+        } else {
+            $exists = $pdo->prepare('SELECT COUNT(*) FROM expense_categories WHERE category_name = ? AND id != ?');
+            $exists->execute([$catName, $catId]);
+            if ((int)$exists->fetchColumn() > 0) {
+                setFlash('danger', 'Tên loại chi phí đã tồn tại.');
+            } else {
+                $pdo->prepare('UPDATE expense_categories SET category_name = ? WHERE id = ?')
+                    ->execute([$catName, $catId]);
+                setFlash('success', 'Đã cập nhật loại chi phí.');
+            }
+        }
+        redirect($expensePageUrl(['tab' => 'categories']));
+    }
+
+    if ($action === 'toggle_category') {
+        if (!$canManageCategories) {
+            setFlash('danger', 'Bạn không có quyền thực hiện thao tác này.');
+            redirect($expensePageUrl(['tab' => 'categories']));
+        }
+
+        $catId = (int)($_POST['category_id'] ?? 0);
+        if ($catId > 0) {
+            $pdo->prepare('UPDATE expense_categories SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END WHERE id = ?')
+                ->execute([$catId]);
+            setFlash('success', 'Đã cập nhật trạng thái loại chi phí.');
+        }
+        redirect($expensePageUrl(['tab' => 'categories']));
+    }
 
     if ($action === 'create') {
         $expenseId = (int)($_POST['expense_id'] ?? 0);
@@ -439,9 +513,16 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                 <h4 class="mb-1"><i class="fas fa-file-invoice-dollar me-2 text-primary"></i>Quản lý chi phí hành chính</h4>
                 <p class="text-muted mb-0">Tạo đề xuất, gửi duyệt và theo dõi thanh toán theo luồng form POST truyền thống.</p>
             </div>
-            <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#expense-form-card" aria-expanded="<?= $showForm ? 'true' : 'false' ?>" <?= $categories ? '' : 'disabled' ?> >
-                <i class="fas fa-plus me-1"></i> Tạo đề xuất
-            </button>
+            <div class="d-flex flex-wrap gap-2">
+                <?php if ($canManageCategories): ?>
+                    <a href="/erp/<?= e($expensePageUrl(['tab' => 'categories'])) ?>" class="btn btn-outline-secondary">
+                        <i class="fas fa-tags me-1"></i>Loại chi phí
+                    </a>
+                <?php endif; ?>
+                <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#expense-form-card" aria-expanded="<?= $showForm ? 'true' : 'false' ?>" <?= $categories ? '' : 'disabled' ?> >
+                    <i class="fas fa-plus me-1"></i> Tạo đề xuất
+                </button>
+            </div>
         </div>
 
         <?php showFlash(); ?>
@@ -466,7 +547,14 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                         </div>
                     <?php endif; ?>
                     <?php if (!$categories): ?>
-                        <div class="alert alert-warning mb-0">Chưa có loại chi phí nào. Vui lòng thêm dữ liệu vào bảng <code>expense_categories</code>.</div>
+                        <div class="alert alert-warning mb-0">
+                            Chưa có loại chi phí nào.
+                            <?php if ($canManageCategories): ?>
+                                Vui lòng thêm tại tab <strong>Loại chi phí</strong>.
+                            <?php else: ?>
+                                Vui lòng liên hệ kế toán hoặc giám đốc để bổ sung dữ liệu.
+                            <?php endif; ?>
+                        </div>
                     <?php else: ?>
                         <form method="post">
                             <?= csrfInput() ?>
@@ -538,37 +626,39 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
             </div>
         </div>
 
-        <div class="card border-0 shadow-sm mb-3">
-            <div class="card-body py-2">
-                <form method="get" class="row g-2 align-items-center">
-                    <input type="hidden" name="tab" value="<?= e($activeTab) ?>">
-                    <div class="col-md-2">
-                        <input type="month" name="month" class="form-control form-control-sm" value="<?= e($filterMonth) ?>">
-                    </div>
-                    <div class="col-md-3">
-                        <select name="category_id" class="form-select form-select-sm">
-                            <option value="">-- Loại chi phí --</option>
-                            <?php foreach ($categories as $category): ?>
-                                <option value="<?= (int)$category['id'] ?>" <?= $filterCategory === (int)$category['id'] ? 'selected' : '' ?>><?= e($category['category_name']) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <select name="status" class="form-select form-select-sm">
-                            <option value="">-- Trạng thái --</option>
-                            <option value="draft" <?= $filterStatus === 'draft' ? 'selected' : '' ?>>Nháp</option>
-                            <option value="submitted" <?= $filterStatus === 'submitted' ? 'selected' : '' ?>>Chờ duyệt</option>
-                            <option value="approved" <?= $filterStatus === 'approved' ? 'selected' : '' ?>>Đã duyệt</option>
-                            <option value="rejected" <?= $filterStatus === 'rejected' ? 'selected' : '' ?>>Từ chối</option>
-                        </select>
-                    </div>
-                    <div class="col-auto">
-                        <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-filter me-1"></i>Lọc</button>
-                        <a href="/erp/<?= e($expensePageUrl(['status' => '', 'category_id' => 0])) ?>" class="btn btn-sm btn-outline-secondary ms-1">Reset</a>
-                    </div>
-                </form>
+        <?php if ($activeTab !== 'categories'): ?>
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-body py-2">
+                    <form method="get" class="row g-2 align-items-center">
+                        <input type="hidden" name="tab" value="<?= e($activeTab) ?>">
+                        <div class="col-md-2">
+                            <input type="month" name="month" class="form-control form-control-sm" value="<?= e($filterMonth) ?>">
+                        </div>
+                        <div class="col-md-3">
+                            <select name="category_id" class="form-select form-select-sm">
+                                <option value="">-- Loại chi phí --</option>
+                                <?php foreach ($categories as $category): ?>
+                                    <option value="<?= (int)$category['id'] ?>" <?= $filterCategory === (int)$category['id'] ? 'selected' : '' ?>><?= e($category['category_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <select name="status" class="form-select form-select-sm">
+                                <option value="">-- Trạng thái --</option>
+                                <option value="draft" <?= $filterStatus === 'draft' ? 'selected' : '' ?>>Nháp</option>
+                                <option value="submitted" <?= $filterStatus === 'submitted' ? 'selected' : '' ?>>Chờ duyệt</option>
+                                <option value="approved" <?= $filterStatus === 'approved' ? 'selected' : '' ?>>Đã duyệt</option>
+                                <option value="rejected" <?= $filterStatus === 'rejected' ? 'selected' : '' ?>>Từ chối</option>
+                            </select>
+                        </div>
+                        <div class="col-auto">
+                            <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-filter me-1"></i>Lọc</button>
+                            <a href="/erp/<?= e($expensePageUrl(['status' => '', 'category_id' => 0])) ?>" class="btn btn-sm btn-outline-secondary ms-1">Reset</a>
+                        </div>
+                    </form>
+                </div>
             </div>
-        </div>
+        <?php endif; ?>
 
         <ul class="nav nav-tabs mb-3">
             <li class="nav-item"><a class="nav-link <?= $activeTab === 'mine' ? 'active' : '' ?>" href="/erp/<?= e($expensePageUrl(['tab' => 'mine'])) ?>">Của tôi <span class="badge bg-secondary ms-1"><?= $mineCount ?></span></a></li>
@@ -576,158 +666,292 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                 <li class="nav-item"><a class="nav-link <?= $activeTab === 'pending' ? 'active' : '' ?>" href="/erp/<?= e($expensePageUrl(['tab' => 'pending', 'status' => ''])) ?>">Chờ duyệt <span class="badge bg-warning text-dark ms-1"><?= $pendingCount ?></span></a></li>
             <?php endif; ?>
             <li class="nav-item"><a class="nav-link <?= $activeTab === 'history' ? 'active' : '' ?>" href="/erp/<?= e($expensePageUrl(['tab' => 'history', 'status' => ''])) ?>">Lịch sử <span class="badge bg-success ms-1"><?= $historyCount ?></span></a></li>
+            <?php if ($canManageCategories): ?>
+                <li class="nav-item">
+                    <a class="nav-link <?= $activeTab === 'categories' ? 'active' : '' ?>" href="/erp/<?= e($expensePageUrl(['tab' => 'categories'])) ?>">
+                        <i class="fas fa-tags me-1"></i>Loại chi phí
+                        <span class="badge bg-secondary ms-1"><?= count($allCategories) ?></span>
+                    </a>
+                </li>
+            <?php endif; ?>
         </ul>
 
-        <div class="card border-0 shadow-sm">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>Số phiếu</th>
-                            <th>Ngày</th>
-                            <th>Loại</th>
-                            <th>Mục đích</th>
-                            <th class="text-end">Số tiền</th>
-                            <th>Trạng thái</th>
-                            <th>Thao tác</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    <?php if (!$expenses): ?>
-                        <tr><td colspan="7" class="text-center text-muted py-4">Chưa có đề xuất chi phí nào.</td></tr>
-                    <?php else: ?>
-                        <?php foreach ($expenses as $expense): ?>
-                            <?php
-                            $paidAmount = (float)$expense['paid_amount'];
-                            $remainingAmount = (float)$expense['amount'] - $paidAmount;
-                            $statusBadgeClass = match ($expense['status']) {
-                                'submitted' => 'warning text-dark',
-                                'approved' => 'success',
-                                'rejected' => 'danger',
-                                default => 'secondary',
-                            };
-                            $statusLabel = match ($expense['status']) {
-                                'submitted' => 'Chờ duyệt',
-                                'approved' => 'Đã duyệt',
-                                'rejected' => 'Từ chối',
-                                default => 'Nháp',
-                            };
-                            ?>
+        <?php if ($activeTab === 'categories' && $canManageCategories): ?>
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-header bg-white">
+                            <h6 class="mb-0"><i class="fas fa-plus-circle me-2 text-success"></i>Thêm loại chi phí mới</h6>
+                        </div>
+                        <div class="card-body">
+                            <form method="post">
+                                <?= csrfInput() ?>
+                                <input type="hidden" name="action" value="create_category">
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Tên loại chi phí <span class="text-danger">*</span></label>
+                                    <input type="text" name="category_name" class="form-control" placeholder="VD: Tiền điện, Thuê văn phòng..." maxlength="100" required>
+                                    <div class="form-text">Tên sẽ hiển thị trong form tạo đề xuất chi phí.</div>
+                                </div>
+                                <button type="submit" class="btn btn-success w-100">
+                                    <i class="fas fa-plus me-1"></i>Thêm loại chi phí
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-8">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0"><i class="fas fa-list me-2 text-primary"></i>Danh sách loại chi phí</h6>
+                            <span class="text-muted small"><?= count($allCategories) ?> loại</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <?php if (!$allCategories): ?>
+                                <div class="p-4 text-center text-muted">Chưa có loại chi phí nào.</div>
+                            <?php else: ?>
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>#</th>
+                                                <th>Tên loại chi phí</th>
+                                                <th class="text-center">Số đề xuất</th>
+                                                <th class="text-center">Trạng thái</th>
+                                                <th class="text-center">Thao tác</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                        <?php foreach ($allCategories as $i => $cat): ?>
+                                            <tr class="<?= !(int)$cat['is_active'] ? 'table-secondary opacity-75' : '' ?>">
+                                                <td class="text-muted small"><?= $i + 1 ?></td>
+                                                <td>
+                                                    <span class="fw-semibold <?= !(int)$cat['is_active'] ? 'text-muted text-decoration-line-through' : '' ?>">
+                                                        <?= e($cat['category_name']) ?>
+                                                    </span>
+                                                </td>
+                                                <td class="text-center">
+                                                    <?php if ((int)$cat['usage_count'] > 0): ?>
+                                                        <span class="badge bg-info"><?= (int)$cat['usage_count'] ?> đề xuất</span>
+                                                    <?php else: ?>
+                                                        <span class="text-muted small">Chưa dùng</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td class="text-center">
+                                                    <?php if ((int)$cat['is_active'] === 1): ?>
+                                                        <span class="badge bg-success">Đang dùng</span>
+                                                    <?php else: ?>
+                                                        <span class="badge bg-secondary">Đã ẩn</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td class="text-center">
+                                                    <div class="d-flex gap-1 justify-content-center">
+                                                        <button
+                                                            type="button"
+                                                            class="btn btn-sm btn-outline-primary"
+                                                            onclick='openEditModal(<?= (int)$cat['id'] ?>, <?= json_encode((string)$cat['category_name'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>)'
+                                                            title="Sửa tên"
+                                                        >
+                                                            <i class="fas fa-edit"></i>
+                                                        </button>
+                                                        <form method="post" class="d-inline" onsubmit="return confirm('<?= (int)$cat['is_active'] === 1 ? 'Ẩn' : 'Kích hoạt' ?> loại chi phí này?')">
+                                                            <?= csrfInput() ?>
+                                                            <input type="hidden" name="action" value="toggle_category">
+                                                            <input type="hidden" name="category_id" value="<?= (int)$cat['id'] ?>">
+                                                            <button type="submit" class="btn btn-sm <?= (int)$cat['is_active'] === 1 ? 'btn-outline-secondary' : 'btn-outline-success' ?>" title="<?= (int)$cat['is_active'] === 1 ? 'Ẩn' : 'Kích hoạt' ?>">
+                                                                <i class="fas <?= (int)$cat['is_active'] === 1 ? 'fa-eye-slash' : 'fa-eye' ?>"></i>
+                                                            </button>
+                                                        </form>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal fade" id="editCategoryModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form method="post">
+                            <?= csrfInput() ?>
+                            <input type="hidden" name="action" value="edit_category">
+                            <input type="hidden" name="category_id" id="editCategoryId">
+                            <div class="modal-header">
+                                <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Sửa loại chi phí</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <label class="form-label fw-semibold">Tên loại chi phí <span class="text-danger">*</span></label>
+                                <input type="text" name="category_name" id="editCategoryName" class="form-control" maxlength="100" required>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Huỷ</button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save me-1"></i>Lưu thay đổi
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        <?php else: ?>
+            <div class="card border-0 shadow-sm">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-dark">
                             <tr>
-                                <td class="fw-semibold text-primary"><?= e($expense['request_no']) ?></td>
-                                <td><?= e(formatDate($expense['expense_date'])) ?></td>
-                                <td><?= e($expense['category_name']) ?></td>
-                                <td>
-                                    <div class="fw-semibold"><?= e($expense['purpose']) ?></div>
-                                    <div class="small text-muted">Người đề xuất: <?= e($expense['requested_name']) ?></div>
-                                    <?php if (!empty($expense['note'])): ?>
-                                        <div class="small text-muted">Ghi chú: <?= e($expense['note']) ?></div>
-                                    <?php endif; ?>
-                                    <?php if ($expense['status'] === 'rejected' && !empty($expense['reject_reason'])): ?>
-                                        <div class="small text-danger">Lý do từ chối: <?= e($expense['reject_reason']) ?></div>
-                                    <?php endif; ?>
-                                </td>
-                                <td class="text-end">
-                                    <div class="fw-semibold"><?= e(formatCurrency($expense['amount'])) ?></div>
-                                    <?php if ($paidAmount > 0): ?>
-                                        <div class="small text-success">Đã TT: <?= e(formatCurrency($paidAmount)) ?></div>
-                                        <div class="small <?= $remainingAmount > 0 ? 'text-danger' : 'text-muted' ?>">Còn lại: <?= e(formatCurrency(max(0, $remainingAmount))) ?></div>
-                                    <?php endif; ?>
-                                </td>
-                                <td>
-                                    <span class="badge bg-<?= $statusBadgeClass ?>"><?= $statusLabel ?></span>
-                                    <?php if (!empty($expense['approved_name'])): ?>
-                                        <div class="small text-muted mt-1"><?= e($expense['approved_name']) ?></div>
-                                    <?php endif; ?>
-                                </td>
-                                <td>
-                                    <div class="d-flex flex-wrap gap-1">
-                                        <?php if ($expense['status'] === 'draft' && (int)$expense['requested_by'] === currentUserId()): ?>
-                                            <a href="/erp/<?= e($expensePageUrl(['tab' => 'mine', 'edit_id' => (int)$expense['id'], 'show_form' => 1])) ?>#expense-form" class="btn btn-sm btn-outline-primary">Sửa</a>
-                                            <form method="post" class="d-inline">
-                                                <?= csrfInput() ?>
-                                                <input type="hidden" name="action" value="submit">
-                                                <input type="hidden" name="id" value="<?= (int)$expense['id'] ?>">
-                                                <button type="submit" class="btn btn-sm btn-outline-success" onclick="return confirm('Gửi đề xuất này để duyệt?');">Gửi duyệt</button>
-                                            </form>
-                                            <form method="post" class="d-inline">
-                                                <?= csrfInput() ?>
-                                                <input type="hidden" name="action" value="delete">
-                                                <input type="hidden" name="id" value="<?= (int)$expense['id'] ?>">
-                                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Xoá đề xuất này?');">Xóa</button>
-                                            </form>
-                                        <?php endif; ?>
-
-                                        <?php if ($expense['status'] === 'submitted' && $canApprove): ?>
-                                            <form method="post" class="d-inline">
-                                                <?= csrfInput() ?>
-                                                <input type="hidden" name="action" value="approve">
-                                                <input type="hidden" name="id" value="<?= (int)$expense['id'] ?>">
-                                                <button type="submit" class="btn btn-sm btn-outline-success" onclick="return confirm('Duyệt đề xuất này?');">Duyệt</button>
-                                            </form>
-                                            <form method="post" class="d-inline-flex flex-wrap gap-1 align-items-center mt-1">
-                                                <?= csrfInput() ?>
-                                                <input type="hidden" name="action" value="reject">
-                                                <input type="hidden" name="id" value="<?= (int)$expense['id'] ?>">
-                                                <input type="text" name="reject_reason" class="form-control form-control-sm" placeholder="Lý do từ chối" required>
-                                                <button type="submit" class="btn btn-sm btn-outline-danger">Từ chối</button>
-                                            </form>
-                                        <?php endif; ?>
-
-                                        <?php if ($expense['status'] === 'approved' && $canRecordPayment && $remainingAmount > 0): ?>
-                                            <button type="button" class="btn btn-sm btn-outline-secondary btn-payment"
-                                                    data-bs-toggle="modal"
-                                                    data-bs-target="#paymentModal"
-                                                    data-expense-id="<?= (int)$expense['id'] ?>"
-                                                    data-request-no="<?= e($expense['request_no']) ?>"
-                                                    data-remaining="<?= e((string)$remainingAmount) ?>">
-                                                Ghi thanh toán
-                                            </button>
-                                        <?php endif; ?>
-
-                                        <?php if (!empty($paymentsByExpense[(int)$expense['id']])): ?>
-                                            <button class="btn btn-sm btn-outline-dark" type="button" data-bs-toggle="collapse" data-bs-target="#payments-<?= (int)$expense['id'] ?>">Lịch sử TT</button>
-                                        <?php endif; ?>
-                                    </div>
-                                </td>
+                                <th>Số phiếu</th>
+                                <th>Ngày</th>
+                                <th>Loại</th>
+                                <th>Mục đích</th>
+                                <th class="text-end">Số tiền</th>
+                                <th>Trạng thái</th>
+                                <th>Thao tác</th>
                             </tr>
-                            <?php if (!empty($paymentsByExpense[(int)$expense['id']])): ?>
-                                <tr class="collapse" id="payments-<?= (int)$expense['id'] ?>">
-                                    <td colspan="7" class="bg-light">
-                                        <div class="small fw-semibold mb-2">Lịch sử thanh toán</div>
-                                        <div class="table-responsive">
-                                            <table class="table table-sm mb-0">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Ngày</th>
-                                                        <th class="text-end">Số tiền</th>
-                                                        <th>Hình thức</th>
-                                                        <th>Người ghi nhận</th>
-                                                        <th>Ghi chú</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    <?php foreach ($paymentsByExpense[(int)$expense['id']] as $payment): ?>
-                                                        <tr>
-                                                            <td><?= e(formatDate($payment['payment_date'])) ?></td>
-                                                            <td class="text-end"><?= e(formatCurrency($payment['amount'])) ?></td>
-                                                            <td><?= $payment['payment_method'] === 'bank_transfer' ? 'Chuyển khoản' : 'Tiền mặt' ?></td>
-                                                            <td><?= e($payment['paid_by_name'] ?? '—') ?></td>
-                                                            <td><?= e($payment['note'] ?? '—') ?></td>
-                                                        </tr>
-                                                    <?php endforeach; ?>
-                                                </tbody>
-                                            </table>
+                        </thead>
+                        <tbody>
+                        <?php if (!$expenses): ?>
+                            <tr><td colspan="7" class="text-center text-muted py-4">Chưa có đề xuất chi phí nào.</td></tr>
+                        <?php else: ?>
+                            <?php foreach ($expenses as $expense): ?>
+                                <?php
+                                $paidAmount = (float)$expense['paid_amount'];
+                                $remainingAmount = (float)$expense['amount'] - $paidAmount;
+                                $statusBadgeClass = match ($expense['status']) {
+                                    'submitted' => 'warning text-dark',
+                                    'approved' => 'success',
+                                    'rejected' => 'danger',
+                                    default => 'secondary',
+                                };
+                                $statusLabel = match ($expense['status']) {
+                                    'submitted' => 'Chờ duyệt',
+                                    'approved' => 'Đã duyệt',
+                                    'rejected' => 'Từ chối',
+                                    default => 'Nháp',
+                                };
+                                ?>
+                                <tr>
+                                    <td class="fw-semibold text-primary"><?= e($expense['request_no']) ?></td>
+                                    <td><?= e(formatDate($expense['expense_date'])) ?></td>
+                                    <td><?= e($expense['category_name']) ?></td>
+                                    <td>
+                                        <div class="fw-semibold"><?= e($expense['purpose']) ?></div>
+                                        <div class="small text-muted">Người đề xuất: <?= e($expense['requested_name']) ?></div>
+                                        <?php if (!empty($expense['note'])): ?>
+                                            <div class="small text-muted">Ghi chú: <?= e($expense['note']) ?></div>
+                                        <?php endif; ?>
+                                        <?php if ($expense['status'] === 'rejected' && !empty($expense['reject_reason'])): ?>
+                                            <div class="small text-danger">Lý do từ chối: <?= e($expense['reject_reason']) ?></div>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="fw-semibold"><?= e(formatCurrency($expense['amount'])) ?></div>
+                                        <?php if ($paidAmount > 0): ?>
+                                            <div class="small text-success">Đã TT: <?= e(formatCurrency($paidAmount)) ?></div>
+                                            <div class="small <?= $remainingAmount > 0 ? 'text-danger' : 'text-muted' ?>">Còn lại: <?= e(formatCurrency(max(0, $remainingAmount))) ?></div>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-<?= $statusBadgeClass ?>"><?= $statusLabel ?></span>
+                                        <?php if (!empty($expense['approved_name'])): ?>
+                                            <div class="small text-muted mt-1"><?= e($expense['approved_name']) ?></div>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex flex-wrap gap-1">
+                                            <?php if ($expense['status'] === 'draft' && (int)$expense['requested_by'] === currentUserId()): ?>
+                                                <a href="/erp/<?= e($expensePageUrl(['tab' => 'mine', 'edit_id' => (int)$expense['id'], 'show_form' => 1])) ?>#expense-form" class="btn btn-sm btn-outline-primary">Sửa</a>
+                                                <form method="post" class="d-inline">
+                                                    <?= csrfInput() ?>
+                                                    <input type="hidden" name="action" value="submit">
+                                                    <input type="hidden" name="id" value="<?= (int)$expense['id'] ?>">
+                                                    <button type="submit" class="btn btn-sm btn-outline-success" onclick="return confirm('Gửi đề xuất này để duyệt?');">Gửi duyệt</button>
+                                                </form>
+                                                <form method="post" class="d-inline">
+                                                    <?= csrfInput() ?>
+                                                    <input type="hidden" name="action" value="delete">
+                                                    <input type="hidden" name="id" value="<?= (int)$expense['id'] ?>">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Xoá đề xuất này?');">Xóa</button>
+                                                </form>
+                                            <?php endif; ?>
+
+                                            <?php if ($expense['status'] === 'submitted' && $canApprove): ?>
+                                                <form method="post" class="d-inline">
+                                                    <?= csrfInput() ?>
+                                                    <input type="hidden" name="action" value="approve">
+                                                    <input type="hidden" name="id" value="<?= (int)$expense['id'] ?>">
+                                                    <button type="submit" class="btn btn-sm btn-outline-success" onclick="return confirm('Duyệt đề xuất này?');">Duyệt</button>
+                                                </form>
+                                                <form method="post" class="d-inline-flex flex-wrap gap-1 align-items-center mt-1">
+                                                    <?= csrfInput() ?>
+                                                    <input type="hidden" name="action" value="reject">
+                                                    <input type="hidden" name="id" value="<?= (int)$expense['id'] ?>">
+                                                    <input type="text" name="reject_reason" class="form-control form-control-sm" placeholder="Lý do từ chối" required>
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger">Từ chối</button>
+                                                </form>
+                                            <?php endif; ?>
+
+                                            <?php if ($expense['status'] === 'approved' && $canRecordPayment && $remainingAmount > 0): ?>
+                                                <button type="button" class="btn btn-sm btn-outline-secondary btn-payment"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="#paymentModal"
+                                                        data-expense-id="<?= (int)$expense['id'] ?>"
+                                                        data-request-no="<?= e($expense['request_no']) ?>"
+                                                        data-remaining="<?= e((string)$remainingAmount) ?>">
+                                                    Ghi thanh toán
+                                                </button>
+                                            <?php endif; ?>
+
+                                            <?php if (!empty($paymentsByExpense[(int)$expense['id']])): ?>
+                                                <button class="btn btn-sm btn-outline-dark" type="button" data-bs-toggle="collapse" data-bs-target="#payments-<?= (int)$expense['id'] ?>">Lịch sử TT</button>
+                                            <?php endif; ?>
                                         </div>
                                     </td>
                                 </tr>
-                            <?php endif; ?>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                    </tbody>
-                </table>
+                                <?php if (!empty($paymentsByExpense[(int)$expense['id']])): ?>
+                                    <tr class="collapse" id="payments-<?= (int)$expense['id'] ?>">
+                                        <td colspan="7" class="bg-light">
+                                            <div class="small fw-semibold mb-2">Lịch sử thanh toán</div>
+                                            <div class="table-responsive">
+                                                <table class="table table-sm mb-0">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Ngày</th>
+                                                            <th class="text-end">Số tiền</th>
+                                                            <th>Hình thức</th>
+                                                            <th>Người ghi nhận</th>
+                                                            <th>Ghi chú</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <?php foreach ($paymentsByExpense[(int)$expense['id']] as $payment): ?>
+                                                            <tr>
+                                                                <td><?= e(formatDate($payment['payment_date'])) ?></td>
+                                                                <td class="text-end"><?= e(formatCurrency($payment['amount'])) ?></td>
+                                                                <td><?= $payment['payment_method'] === 'bank_transfer' ? 'Chuyển khoản' : 'Tiền mặt' ?></td>
+                                                                <td><?= e($payment['paid_by_name'] ?? '—') ?></td>
+                                                                <td><?= e($payment['note'] ?? '—') ?></td>
+                                                            </tr>
+                                                        <?php endforeach; ?>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </div>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -781,6 +1005,12 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
 document.getElementById('hasInvoice')?.addEventListener('change', function () {
     document.getElementById('invoiceFields')?.classList.toggle('d-none', !this.checked);
 });
+
+function openEditModal(id, name) {
+    document.getElementById('editCategoryId').value = id;
+    document.getElementById('editCategoryName').value = name;
+    new bootstrap.Modal(document.getElementById('editCategoryModal')).show();
+}
 
 document.querySelectorAll('.btn-payment').forEach((button) => {
     button.addEventListener('click', () => {
