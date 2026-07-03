@@ -237,7 +237,5 @@ echo json_encode([
     'chart_expense'      => $chartExpense,
     'chart_debt'         => $chartDebt,
     'top_debtors'        => $topDebtors,
-    'inventory_items'    => $inventoryItems,
-    'inventory_total_qty'=> $inventoryTotalQty,
     'top_inventory'      => $topInventory,
 ], JSON_UNESCAPED_UNICODE);
