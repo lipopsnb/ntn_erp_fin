@@ -17,9 +17,7 @@ $prevFrom = date('Y-m-01', strtotime($dateFrom . ' -1 month'));
 $prevTo   = date('Y-m-t',  strtotime($dateFrom . ' -1 month'));
 
 function fmtAmount(float $n): string {
-    if ($n >= 1_000_000_000) return round($n / 1_000_000_000, 1) . ' tỷ';
-    if ($n >= 1_000_000)     return round($n / 1_000_000, 0)     . ' triệu';
-    return number_format($n) . ' đ';
+    return number_format($n, 0, ',', '.') . ' đ';
 }
 
 // ── KPI: Doanh thu tháng ───────────────────────────────────────────────────

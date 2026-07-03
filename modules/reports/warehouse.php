@@ -11,6 +11,34 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
 <div class="main-content">
 <div class="container-fluid py-4">
 
+  <!-- Nav tabs điều hướng giữa các dashboard -->
+  <ul class="nav nav-pills mb-4 border-bottom pb-3">
+    <li class="nav-item">
+      <a class="nav-link <?= strpos($_SERVER['REQUEST_URI'], '/reports/index') !== false || (strpos($_SERVER['REQUEST_URI'], '/reports/') !== false && strpos($_SERVER['REQUEST_URI'], 'production') === false && strpos($_SERVER['REQUEST_URI'], 'warehouse') === false && strpos($_SERVER['REQUEST_URI'], 'finance') === false) ? 'active' : '' ?>"
+         href="/erp/modules/reports/index.php">
+        <i class="fas fa-tachometer-alt me-1"></i>Tổng quan
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link <?= strpos($_SERVER['REQUEST_URI'], 'production') !== false ? 'active' : '' ?>"
+         href="/erp/modules/reports/production.php">
+        <i class="fas fa-industry me-1"></i>Sản xuất
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link <?= strpos($_SERVER['REQUEST_URI'], 'warehouse') !== false ? 'active' : '' ?>"
+         href="/erp/modules/reports/warehouse.php">
+        <i class="fas fa-warehouse me-1"></i>Kho
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link <?= strpos($_SERVER['REQUEST_URI'], 'finance') !== false ? 'active' : '' ?>"
+         href="/erp/modules/reports/finance.php">
+        <i class="fas fa-chart-line me-1"></i>Tài chính
+      </a>
+    </li>
+  </ul>
+
   <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
       <h4 class="mb-1"><i class="fas fa-warehouse me-2 text-info"></i>Báo cáo Kho vật tư</h4>
