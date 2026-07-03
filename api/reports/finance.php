@@ -15,6 +15,8 @@ function fmtAmount(float $n): string {
     return number_format($n, 0, ',', '.') . ' đ';
 }
 
+const AVERAGE_DAYS_PER_MONTH = 30.4375;
+
 // ── KPI: Doanh thu theo kỳ ───────────────────────────────────────────────
 $stmtRev = $pdo->prepare("
     SELECT COALESCE(SUM(total_amount), 0)
@@ -38,8 +40,8 @@ $expenseAdminBase = (float)$stmtExp->fetchColumn();
 $dateFromObj = new DateTime($dateFrom);
 $dateToObj = new DateTime($dateTo);
 $daysDiff = (int)$dateFromObj->diff($dateToObj)->days + 1;
-// 30.4375 = số ngày trung bình mỗi tháng (365.25 / 12), dùng để quy đổi khoảng ngày sang phần tháng.
-$monthFraction = $daysDiff / 30.4375;
+// AVERAGE_DAYS_PER_MONTH = số ngày trung bình mỗi tháng (365.25 / 12), dùng để quy đổi khoảng ngày sang phần tháng.
+$monthFraction = $daysDiff / AVERAGE_DAYS_PER_MONTH;
 
 $stmtDepr = $pdo->prepare("
     SELECT COALESCE(SUM(

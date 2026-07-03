@@ -308,14 +308,15 @@ $maintenanceList = $selectedVehicle ? fetchAllSafe($pdo,
 ) : [];
 $trips = $selectedVehicle ? fetchAllSafe($pdo, 'SELECT vt.*, u.full_name AS driver_name FROM vehicle_trips vt LEFT JOIN users u ON u.id = vt.driver_id WHERE vt.vehicle_id = ? ORDER BY vt.trip_date DESC, vt.id DESC', [$selectedVehicleId]) : [];
 $drivers = fetchAllSafe($pdo, 'SELECT id, full_name, username FROM users WHERE is_active = 1 ORDER BY full_name');
-$thisMonth = date('Y-m');
+$thisMonthStart = date('Y-m-01');
+$thisMonthEnd = date('Y-m-t');
 $stmtVehicleCostMonth = $pdo->prepare("
     SELECT
-        COALESCE((SELECT SUM(amount) FROM vehicle_fuel WHERE DATE_FORMAT(fuel_date, '%Y-%m') = ?), 0)
-      + COALESCE((SELECT SUM(amount) FROM vehicle_maintenance WHERE DATE_FORMAT(maintenance_date, '%Y-%m') = ?), 0)
-      + COALESCE((SELECT SUM(toll_fee) FROM vehicle_trips WHERE DATE_FORMAT(trip_date, '%Y-%m') = ? AND toll_fee IS NOT NULL), 0)
+        COALESCE((SELECT SUM(amount) FROM vehicle_fuel WHERE fuel_date BETWEEN ? AND ?), 0)
+      + COALESCE((SELECT SUM(amount) FROM vehicle_maintenance WHERE maintenance_date BETWEEN ? AND ?), 0)
+      + COALESCE((SELECT SUM(toll_fee) FROM vehicle_trips WHERE trip_date BETWEEN ? AND ? AND toll_fee IS NOT NULL), 0)
 ");
-$stmtVehicleCostMonth->execute([$thisMonth, $thisMonth, $thisMonth]);
+$stmtVehicleCostMonth->execute([$thisMonthStart, $thisMonthEnd, $thisMonthStart, $thisMonthEnd, $thisMonthStart, $thisMonthEnd]);
 $vehicleCostMonth = (float)$stmtVehicleCostMonth->fetchColumn();
 
 $editVehicle = null;
