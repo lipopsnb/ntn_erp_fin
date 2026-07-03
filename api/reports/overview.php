@@ -152,6 +152,18 @@ $topCustomers = $pdo->query("
     LIMIT 5
 ")->fetchAll();
 
+// ── KPI: Chi phí lương tháng hiện tại ────────────────────────────────────
+$stmtPayrollCost = $pdo->prepare("
+    SELECT COALESCE(SUM(ps.gross_salary + ps.si_company), 0) AS tong_chi_phi
+    FROM payroll_slips ps
+    JOIN payroll_periods pp ON pp.id = ps.period_id
+    WHERE pp.status IN ('approved','locked')
+      AND pp.period_from <= ?
+      AND pp.period_to   >= ?
+");
+$stmtPayrollCost->execute([$dateTo, $dateFrom]);
+$payrollCost = (float)$stmtPayrollCost->fetchColumn();
+
 // ── Cảnh báo ─────────────────────────────────────────────────────────────
 $alerts = [];
 
@@ -241,6 +253,8 @@ echo json_encode([
         'stock_items'        => $stockItems,
         'orders_upcoming'    => $ordersUpcoming,
         'orders_late'        => $ordersLate,
+        'payroll_cost'       => $payrollCost,
+        'payroll_cost_fmt'   => fmtAmount($payrollCost),
     ],
     'chart_revenue'   => $chartRevRows,
     'orders_progress' => $ordersProgress,

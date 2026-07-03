@@ -17,7 +17,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
   <!-- Nav tabs điều hướng giữa các dashboard -->
   <ul class="nav nav-pills mb-4 border-bottom pb-3">
     <li class="nav-item">
-      <a class="nav-link <?= strpos($_SERVER['REQUEST_URI'], '/reports/index') !== false || (strpos($_SERVER['REQUEST_URI'], '/reports/') !== false && strpos($_SERVER['REQUEST_URI'], 'production') === false && strpos($_SERVER['REQUEST_URI'], 'warehouse') === false && strpos($_SERVER['REQUEST_URI'], 'finance') === false) ? 'active' : '' ?>"
+      <a class="nav-link <?= strpos($_SERVER['REQUEST_URI'], '/reports/index') !== false || (strpos($_SERVER['REQUEST_URI'], '/reports/') !== false && strpos($_SERVER['REQUEST_URI'], 'production') === false && strpos($_SERVER['REQUEST_URI'], 'warehouse') === false && strpos($_SERVER['REQUEST_URI'], 'finance') === false && strpos($_SERVER['REQUEST_URI'], 'payroll') === false) ? 'active' : '' ?>"
          href="/erp/modules/reports/index.php">
         <i class="fas fa-tachometer-alt me-1"></i>Tổng quan
       </a>
@@ -38,6 +38,12 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
       <a class="nav-link <?= strpos($_SERVER['REQUEST_URI'], 'finance') !== false ? 'active' : '' ?>"
          href="/erp/modules/reports/finance.php">
         <i class="fas fa-chart-line me-1"></i>Tài chính
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link <?= strpos($_SERVER['REQUEST_URI'], 'payroll') !== false ? 'active' : '' ?>"
+         href="/erp/modules/reports/payroll.php">
+        <i class="fas fa-users me-1"></i>Nhân sự &amp; Lương
       </a>
     </li>
   </ul>
@@ -68,11 +74,11 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
     $kpis = [
       ['id'=>'kpiRevenue',     'label'=>'Doanh thu tháng',       'icon'=>'fa-dollar-sign',   'color'=>'primary'],
       ['id'=>'kpiDebt',        'label'=>'Công nợ phải thu',      'icon'=>'fa-hand-holding-usd','color'=>'warning'],
+      ['id'=>'kpiPayroll',     'label'=>'Chi phí lương tháng',   'icon'=>'fa-users',         'color'=>'danger'],
       ['id'=>'kpiOrders',      'label'=>'Đơn đang sản xuất',     'icon'=>'fa-industry',      'color'=>'info'],
       ['id'=>'kpiCompletion',  'label'=>'Hoàn thành SX',         'icon'=>'fa-check-circle',  'color'=>'success'],
       ['id'=>'kpiOqc',         'label'=>'Tỷ lệ lỗi OQC',         'icon'=>'fa-exclamation-triangle','color'=>'danger'],
       ['id'=>'kpiStock',       'label'=>'Mặt hàng còn tồn kho',  'icon'=>'fa-boxes',         'color'=>'secondary'],
-      ['id'=>'kpiUpcoming',    'label'=>'Đơn sắp giao (3 ngày)', 'icon'=>'fa-truck',         'color'=>'info'],
       ['id'=>'kpiLate',        'label'=>'Đơn bị trễ',            'icon'=>'fa-clock',         'color'=>'danger'],
     ];
     foreach ($kpis as $k): ?>
@@ -207,6 +213,11 @@ function loadAll() {
       document.getElementById('kpiRevenueCmp').innerHTML = cmpArrow(k.revenue, k.revenue_prev);
       document.getElementById('kpiDebtVal').textContent = k.debt_fmt;
       document.getElementById('kpiDebtCmp').innerHTML = '';
+      if (document.getElementById('kpiPayrollVal')) {
+        const payFmt = k.payroll_cost_fmt ?? (k.payroll_cost != null ? parseFloat(k.payroll_cost).toLocaleString('vi-VN') + ' đ' : '—');
+        document.getElementById('kpiPayrollVal').textContent = payFmt;
+        document.getElementById('kpiPayrollCmp').innerHTML = '';
+      }
       document.getElementById('kpiOrdersVal').textContent = k.orders_in_progress;
       document.getElementById('kpiOrdersCmp').innerHTML = '';
       document.getElementById('kpiCompletionVal').textContent = fmtPct(k.completion_rate);
@@ -215,8 +226,6 @@ function loadAll() {
       document.getElementById('kpiOqcCmp').innerHTML = '';
       document.getElementById('kpiStockVal').textContent = k.stock_items + ' mặt hàng';
       document.getElementById('kpiStockCmp').innerHTML = '';
-      document.getElementById('kpiUpcomingVal').textContent = k.orders_upcoming + ' đơn';
-      document.getElementById('kpiUpcomingCmp').innerHTML = '';
       document.getElementById('kpiLateVal').textContent = k.orders_late + ' đơn';
       document.getElementById('kpiLateCmp').innerHTML = '';
 
