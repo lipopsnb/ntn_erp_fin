@@ -27,6 +27,7 @@ elseif (isGroupActive(['/warehouse_admin/'])) $activeGroup = 'wh_admin';
 elseif (isGroupActive(['/invoice/'])) $activeGroup = 'invoice';
 elseif (isGroupActive(['/admin/expenses', '/admin/assets', '/admin/vehicles', '/admin/budget'])) $activeGroup = 'admin';
 elseif (isGroupActive(['/modules/kpi/'])) $activeGroup = 'kpi';
+elseif (isGroupActive(['/reports/'])) $activeGroup = 'reports';
 elseif (isGroupActive(['/modules/users/index'])) $activeGroup = 'system';
 ?>
 <div class="sidebar" id="sidebar">
@@ -226,6 +227,26 @@ elseif (isGroupActive(['/modules/users/index'])) $activeGroup = 'system';
           <i class="fas fa-list-alt"></i><span>Danh mục vật tư</span></a></li>
         <li><a class="nav-link <?= isActive('/warehouse_admin/transactions') ?>" href="/erp/modules/warehouse_admin/transactions.php">
           <i class="fas fa-exchange-alt"></i><span>Nhập / Xuất kho</span></a></li>
+      </ul>
+    </li>
+    <?php endif; ?>
+
+    <!-- BÁO CÁO -->
+    <?php if (hasRole('director','accountant','manager')): ?>
+    <li class="nav-item">
+      <a class="nav-link sidebar-group-toggle" href="#" data-target="grp-reports">
+        <i class="fas fa-chart-bar"></i><span>Báo cáo</span>
+        <i class="fas fa-chevron-down sidebar-arrow"></i>
+      </a>
+      <ul class="sidebar-submenu" id="grp-reports">
+        <li><a class="nav-link <?= isActive('/reports/index') ?>" href="/erp/modules/reports/index.php">
+          <i class="fas fa-tachometer-alt"></i><span>Tổng quan</span></a></li>
+        <li><a class="nav-link <?= isActive('/reports/production') ?>" href="/erp/modules/reports/production.php">
+          <i class="fas fa-industry"></i><span>Sản xuất</span></a></li>
+        <li><a class="nav-link <?= isActive('/reports/warehouse') ?>" href="/erp/modules/reports/warehouse.php">
+          <i class="fas fa-warehouse"></i><span>Kho</span></a></li>
+        <li><a class="nav-link <?= isActive('/reports/finance') ?>" href="/erp/modules/reports/finance.php">
+          <i class="fas fa-chart-line"></i><span>Tài chính</span></a></li>
       </ul>
     </li>
     <?php endif; ?>
