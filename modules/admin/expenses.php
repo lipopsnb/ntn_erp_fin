@@ -791,7 +791,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                                 <input type="text" name="category_name" id="editCategoryName" class="form-control" maxlength="100" required>
                             </div>
                             <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Huỷ</button>
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
                                 <button type="submit" class="btn btn-primary">
                                     <i class="fas fa-save me-1"></i>Lưu thay đổi
                                 </button>
