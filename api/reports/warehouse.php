@@ -102,7 +102,7 @@ $lowStockList = $pdo->query("
 // ── Thành phẩm tồn lâu (> 30 ngày chưa xuất) ───────────────────────────
 $oldFinished = $pdo->query("
     SELECT po.order_no AS lot_no, c.customer_name,
-           pi.qty_done, pi.qty_total, pi.updated_at AS created_at
+           pi.qty_done, pi.qty_total, pi.updated_at AS last_updated
     FROM production_items pi
     JOIN production_orders po ON po.id = pi.order_id
     JOIN iqc_receipts r ON r.id = po.iqc_receipt_id
