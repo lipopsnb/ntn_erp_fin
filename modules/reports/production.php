@@ -14,7 +14,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
   <!-- Nav tabs điều hướng giữa các dashboard -->
   <ul class="nav nav-pills mb-4 border-bottom pb-3">
     <li class="nav-item">
-      <a class="nav-link <?= strpos($_SERVER['REQUEST_URI'], '/reports/index') !== false || (strpos($_SERVER['REQUEST_URI'], '/reports/') !== false && strpos($_SERVER['REQUEST_URI'], 'production') === false && strpos($_SERVER['REQUEST_URI'], 'warehouse') === false && strpos($_SERVER['REQUEST_URI'], 'finance') === false) ? 'active' : '' ?>"
+      <a class="nav-link <?= strpos($_SERVER['REQUEST_URI'], '/reports/index') !== false || (strpos($_SERVER['REQUEST_URI'], '/reports/') !== false && strpos($_SERVER['REQUEST_URI'], 'production') === false && strpos($_SERVER['REQUEST_URI'], 'warehouse') === false && strpos($_SERVER['REQUEST_URI'], 'finance') === false && strpos($_SERVER['REQUEST_URI'], 'payroll') === false) ? 'active' : '' ?>"
          href="/erp/modules/reports/index.php">
         <i class="fas fa-tachometer-alt me-1"></i>Tổng quan
       </a>
@@ -35,6 +35,12 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
       <a class="nav-link <?= strpos($_SERVER['REQUEST_URI'], 'finance') !== false ? 'active' : '' ?>"
          href="/erp/modules/reports/finance.php">
         <i class="fas fa-chart-line me-1"></i>Tài chính
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link <?= strpos($_SERVER['REQUEST_URI'], 'payroll') !== false ? 'active' : '' ?>"
+         href="/erp/modules/reports/payroll.php">
+        <i class="fas fa-users me-1"></i>Nhân sự &amp; Lương
       </a>
     </li>
   </ul>
