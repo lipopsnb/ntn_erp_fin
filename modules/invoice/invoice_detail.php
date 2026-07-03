@@ -87,6 +87,21 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                 <i class="fas fa-money-bill-wave me-1"></i>Thu tiền
             </button>
             <?php endif; ?>
+            <?php if (empty($inv['is_locked'])): ?>
+            <button class="btn btn-outline-warning btn-lock"
+                    data-id="<?= $id ?>"
+                    data-no="<?= htmlspecialchars($inv['invoice_no']) ?>"
+                    data-bkav="<?= htmlspecialchars($inv['bkav_invoice_no'] ?? '') ?>"
+                    title="Khoá hoá đơn (nhập số HĐ BKAV)">
+                <i class="fas fa-lock-open me-1"></i>Khoá
+            </button>
+            <?php else: ?>
+            <span class="badge bg-danger align-self-center"
+                  title="Đã khoá — Số BKAV: <?= htmlspecialchars($inv['locked_bkav_no'] ?? '') ?> | Ngày: <?= $inv['locked_bkav_date'] ? date('d/m/Y', strtotime($inv['locked_bkav_date'])) : '' ?>"
+                  style="cursor:help;">
+                <i class="fas fa-lock me-1"></i>Đã khoá
+            </span>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -337,6 +352,52 @@ document.getElementById('btnSavePay')?.addEventListener('click', () => {
     });
 });
 
+document.querySelectorAll('.btn-lock').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.getElementById('lockInvoiceId').value = btn.dataset.id;
+        document.getElementById('lockInvoiceNo').value = btn.dataset.no;
+        document.getElementById('lockBkavNo').value = btn.dataset.bkav || '';
+        new bootstrap.Modal(document.getElementById('modalLock')).show();
+    });
+});
+
+document.getElementById('btnConfirmLock')?.addEventListener('click', () => {
+    const invoiceId = document.getElementById('lockInvoiceId').value;
+    const bkavNo    = document.getElementById('lockBkavNo').value.trim();
+    const bkavDate  = document.getElementById('lockBkavDate').value;
+    if (!bkavNo)   { alert('Vui lòng nhập số hoá đơn BKAV!'); return; }
+    if (!bkavDate) { alert('Vui lòng nhập ngày hoá đơn BKAV!'); return; }
+
+    const btn = document.getElementById('btnConfirmLock');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Đang khoá...';
+
+    fetch('/erp/api/invoice/lock_invoice.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            invoice_id: parseInt(invoiceId),
+            bkav_no:    bkavNo,
+            bkav_date:  bkavDate,
+            csrf_token: CSRF_TOKEN
+        })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('modalLock')).hide();
+            location.reload();
+        } else {
+            alert('Lỗi: ' + res.msg);
+        }
+    })
+    .catch(() => alert('Lỗi kết nối!'))
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-lock me-1"></i>Xác nhận khoá';
+    });
+});
+
 document.querySelector('.btn-vat-detail').addEventListener('click', async function() {
     const invId  = this.dataset.id;
     const bkavNo = this.dataset.bkav;
@@ -496,6 +557,46 @@ function fmtDate(d) {
                 <button type="button" class="btn btn-warning" id="btnConfirmVAT"
                         onclick="pushToBKAV(this.dataset.invId)">
                     <i class="fas fa-paper-plane me-1"></i>Xác nhận xuất BKAV
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============ MODAL KHOÁ HOÁ ĐƠN ============ -->
+<div class="modal fade" id="modalLock" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-lock me-2"></i>Khoá hoá đơn
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning py-2 small mb-3">
+                    <i class="fas fa-exclamation-triangle me-1"></i>
+                    Sau khi khoá, hoá đơn <strong>chỉ giám đốc mới được sửa</strong>.
+                    Thông tin này sẽ được dùng để chuyển sang công nợ.
+                </div>
+                <input type="hidden" id="lockInvoiceId">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Số hoá đơn nội bộ</label>
+                    <input type="text" id="lockInvoiceNo" class="form-control bg-light" readonly>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Số hoá đơn BKAV <span class="text-danger">*</span></label>
+                    <input type="text" id="lockBkavNo" class="form-control" placeholder="Nhập số HĐ do BKAV cấp">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Ngày hoá đơn BKAV <span class="text-danger">*</span></label>
+                    <input type="date" id="lockBkavDate" class="form-control" value="<?= date('Y-m-d') ?>">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Huỷ</button>
+                <button type="button" class="btn btn-danger" id="btnConfirmLock">
+                    <i class="fas fa-lock me-1"></i>Xác nhận khoá
                 </button>
             </div>
         </div>

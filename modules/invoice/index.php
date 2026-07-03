@@ -28,6 +28,7 @@ if (empty($where)) { $where[] = '1=1'; }
 $invoices = $pdo->prepare("
     SELECT i.*,
            i.bkav_invoice_no,
+           i.bkav_status,
            i.is_locked, i.locked_bkav_no, i.locked_bkav_date,
            c.customer_name, c.customer_code,
            u.full_name AS created_by_name,
@@ -193,12 +194,18 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                                 ?>
                             </td>
                             <td class="text-center">
-                                <?php if (!empty($inv['bkav_invoice_no'])): ?>
-                                    <span class="badge bg-success" title="Số HĐ BKAV: <?= htmlspecialchars($inv['bkav_invoice_no']) ?>">
-                                        <i class="fas fa-check me-1"></i>Đã xuất
-                                    </span>
+                                <?php
+                                $bkavIssued = !empty($inv['bkav_invoice_no']) || ($inv['bkav_status'] ?? '') === 'issued';
+                                if ($bkavIssued): ?>
+                                    <i class="fas fa-check-circle text-success"></i>
+                                    <?php if (!empty($inv['bkav_invoice_no'])): ?>
+                                    <small class="d-block text-success" style="font-size:9px;"><?= htmlspecialchars($inv['bkav_invoice_no']) ?></small>
+                                    <?php else: ?>
+                                    <small class="d-block text-warning" style="font-size:9px;">Chờ số</small>
+                                    <?php endif; ?>
                                 <?php else: ?>
-                                    <span class="badge bg-secondary">Chưa xuất</span>
+                                    <i class="fas fa-file-invoice-dollar text-muted"></i>
+                                    <small class="d-block text-muted" style="font-size:9px;">Chưa xuất</small>
                                 <?php endif; ?>
                             </td>
                             <td class="<?= $overdue ? 'text-danger fw-bold' : 'text-muted' ?> small">
@@ -211,10 +218,16 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                                         data-bkav="<?= htmlspecialchars($inv['bkav_invoice_no'] ?? '') ?>"
                                         title="Xuất hoá đơn VAT BKAV"
                                         onclick="event.stopPropagation()">
-                                    <?php if (!empty($inv['bkav_invoice_no'])): ?>
+                                    <?php if ($bkavIssued): ?>
                                         <i class="fas fa-check-circle text-success"></i>
+                                        <?php if (!empty($inv['bkav_invoice_no'])): ?>
+                                        <small class="d-block text-success" style="font-size:9px;"><?= htmlspecialchars($inv['bkav_invoice_no']) ?></small>
+                                        <?php else: ?>
+                                        <small class="d-block text-warning" style="font-size:9px;">Chờ số</small>
+                                        <?php endif; ?>
                                     <?php else: ?>
-                                        <i class="fas fa-file-invoice-dollar"></i>
+                                        <i class="fas fa-file-invoice-dollar text-muted"></i>
+                                        <small class="d-block text-muted" style="font-size:9px;">Chưa xuất</small>
                                     <?php endif; ?>
                                 </button>
                                 <?php if ($inv['status'] !== 'paid' && $inv['status'] !== 'cancelled' && $inv['status'] !== 'draft'): ?>
@@ -234,16 +247,18 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                                     <i class="fas fa-print"></i>
                                 </a>
                                 <?php if (empty($inv['is_locked'])): ?>
-                                <button class="btn btn-sm btn-outline-danger btn-lock"
+                                <button class="btn btn-sm btn-outline-warning btn-lock"
                                         data-id="<?= $inv['id'] ?>"
                                         data-no="<?= htmlspecialchars($inv['invoice_no']) ?>"
                                         data-bkav="<?= htmlspecialchars($inv['bkav_invoice_no'] ?? '') ?>"
-                                        title="Khoá hoá đơn"
+                                        title="Khoá hoá đơn (nhập số HĐ BKAV)"
                                         onclick="event.stopPropagation()">
-                                    <i class="fas fa-lock"></i>
+                                    <i class="fas fa-lock-open"></i>
                                 </button>
                                 <?php else: ?>
-                                <span class="badge bg-danger ms-1" title="Khoá: <?= htmlspecialchars($inv['locked_bkav_no'] ?? '') ?> - <?= $inv['locked_bkav_date'] ? date('d/m/Y', strtotime($inv['locked_bkav_date'])) : '' ?>">
+                                <span class="badge bg-danger ms-1"
+                                      title="Đã khoá — Số BKAV: <?= htmlspecialchars($inv['locked_bkav_no'] ?? '') ?> | Ngày: <?= $inv['locked_bkav_date'] ? date('d/m/Y', strtotime($inv['locked_bkav_date'])) : '' ?>"
+                                      style="cursor:help;">
                                     <i class="fas fa-lock"></i>
                                 </span>
                                 <?php endif; ?>

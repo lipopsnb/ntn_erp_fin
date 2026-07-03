@@ -1,6 +1,8 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/erp/config/database.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/erp/config/auth.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/erp/config/bkav.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/erp/config/functions.php';
 requireLogin();
 
 $pdo = getDBConnection();
@@ -32,6 +34,8 @@ $items = $items->fetchAll(PDO::FETCH_ASSOC);
         * { margin:0; padding:0; box-sizing:border-box; }
         body { font-family:'Times New Roman',serif; font-size:13px; padding:15mm 20mm; }
         h2 { text-align:center; font-size:20px; text-transform:uppercase; margin-bottom:4px; }
+        h2 .company-topline { display:block; font-size:12px; font-weight:normal; text-transform:none; margin-bottom:2px; }
+        h2 .brand-dot { display:inline-block; width:8px; height:8px; background:#c00; margin-right:6px; vertical-align:middle; }
         .subtitle { text-align:center; margin-bottom:16px; }
         .info-table { width:100%; margin-bottom:16px; }
         .info-table td { padding:3px 6px; }
@@ -47,11 +51,29 @@ $items = $items->fetchAll(PDO::FETCH_ASSOC);
         .sign-area { display:flex; justify-content:space-between; margin-top:30px; }
         .sign-box { text-align:center; width:30%; }
         .sign-box .title { font-weight:bold; margin-bottom:50px; }
+        hr { border: none; border-top: 1px solid #999; margin: 6px 0; }
         @media print { body { padding:10mm 15mm; } }
     </style>
 </head>
 <body onload="window.print()">
-    <h2>Hoá đơn bán hàng</h2>
+    <!-- THÔNG TIN NGƯỜI BÁN -->
+    <div style="text-align:center; margin-bottom:8px;">
+        <strong style="font-size:14px;"><?= defined('COMPANY_NAME') ? htmlspecialchars(COMPANY_NAME) : '' ?></strong><br>
+        <span style="font-size:12px;">MST: <?= defined('COMPANY_TAX') ? htmlspecialchars(COMPANY_TAX) : '' ?></span>
+        <?php if (defined('COMPANY_ADDRESS') && COMPANY_ADDRESS): ?>
+        <br><span style="font-size:12px;"><?= htmlspecialchars(COMPANY_ADDRESS) ?></span>
+        <?php endif; ?>
+        <?php if (defined('COMPANY_BANK') && COMPANY_BANK): ?>
+        <br><span style="font-size:12px;">TK: <?= htmlspecialchars(COMPANY_ACCOUNT ?? '') ?> — <?= htmlspecialchars(COMPANY_BANK) ?></span>
+        <?php endif; ?>
+    </div>
+    <hr style="margin-bottom:8px;">
+    <h2>
+        <span class="company-topline">
+            <span class="brand-dot"></span><?= defined('COMPANY_NAME') ? htmlspecialchars(COMPANY_NAME) : '' ?>
+        </span>
+        Hoá đơn bán hàng
+    </h2>
     <div class="subtitle">
         Số: <strong><?= htmlspecialchars($inv['invoice_no']) ?></strong>
         &nbsp;|&nbsp; Ngày: <strong><?= date('d/m/Y', strtotime($inv['invoice_date'])) ?></strong>
