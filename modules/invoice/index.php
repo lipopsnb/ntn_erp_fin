@@ -28,6 +28,7 @@ if (empty($where)) { $where[] = '1=1'; }
 $invoices = $pdo->prepare("
     SELECT i.*,
            i.bkav_invoice_no,
+           i.is_locked, i.locked_bkav_no, i.locked_bkav_date,
            c.customer_name, c.customer_code,
            u.full_name AS created_by_name,
            COALESCE(SUM(p.amount),0) AS paid_amount
@@ -149,13 +150,14 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                             <th class="text-end">Đã thu</th>
                             <th class="text-end">Còn nợ</th>
                             <th>Trạng thái</th>
+                            <th class="text-center">BKAV</th>
                             <th>Hạn TT</th>
                             <th>Thao tác</th>
                         </tr>
                     </thead>
                     <tbody>
                     <?php if (empty($invoices)): ?>
-                        <tr><td colspan="9" class="text-center text-muted py-4">Chưa có hoá đơn nào</td></tr>
+                        <tr><td colspan="10" class="text-center text-muted py-4">Chưa có hoá đơn nào</td></tr>
                     <?php else: ?>
                         <?php foreach ($invoices as $inv):
                             $debt    = $inv['total_amount'] - $inv['paid_amount'];
@@ -190,6 +192,15 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                                 echo "<span class='badge bg-{$s[0]}'>{$s[1]}</span>";
                                 ?>
                             </td>
+                            <td class="text-center">
+                                <?php if (!empty($inv['bkav_invoice_no'])): ?>
+                                    <span class="badge bg-success" title="Số HĐ BKAV: <?= htmlspecialchars($inv['bkav_invoice_no']) ?>">
+                                        <i class="fas fa-check me-1"></i>Đã xuất
+                                    </span>
+                                <?php else: ?>
+                                    <span class="badge bg-secondary">Chưa xuất</span>
+                                <?php endif; ?>
+                            </td>
                             <td class="<?= $overdue ? 'text-danger fw-bold' : 'text-muted' ?> small">
                                 <?= $inv['due_date'] ? date('d/m/Y', strtotime($inv['due_date'])) : '—' ?>
                             </td>
@@ -222,6 +233,20 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                                    onclick="event.stopPropagation()">
                                     <i class="fas fa-print"></i>
                                 </a>
+                                <?php if (empty($inv['is_locked'])): ?>
+                                <button class="btn btn-sm btn-outline-danger btn-lock"
+                                        data-id="<?= $inv['id'] ?>"
+                                        data-no="<?= htmlspecialchars($inv['invoice_no']) ?>"
+                                        data-bkav="<?= htmlspecialchars($inv['bkav_invoice_no'] ?? '') ?>"
+                                        title="Khoá hoá đơn"
+                                        onclick="event.stopPropagation()">
+                                    <i class="fas fa-lock"></i>
+                                </button>
+                                <?php else: ?>
+                                <span class="badge bg-danger ms-1" title="Khoá: <?= htmlspecialchars($inv['locked_bkav_no'] ?? '') ?> - <?= $inv['locked_bkav_date'] ? date('d/m/Y', strtotime($inv['locked_bkav_date'])) : '' ?>">
+                                    <i class="fas fa-lock"></i>
+                                </span>
+                                <?php endif; ?>
                             </td>
                         </tr>
                         <?php endforeach; ?>
@@ -795,6 +820,54 @@ function fmtDate(d) {
     const [y, m, day] = d.split('-');
     return `${day}/${m}/${y}`;
 }
+
+// ── Khoá hoá đơn ──
+document.querySelectorAll('.btn-lock').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.getElementById('lockInvoiceId').value = btn.dataset.id;
+        document.getElementById('lockInvoiceNo').value = btn.dataset.no;
+        // Pre-fill số BKAV nếu đã có
+        document.getElementById('lockBkavNo').value = btn.dataset.bkav || '';
+        new bootstrap.Modal(document.getElementById('modalLock')).show();
+    });
+});
+
+document.getElementById('btnConfirmLock')?.addEventListener('click', () => {
+    const invoiceId = document.getElementById('lockInvoiceId').value;
+    const bkavNo    = document.getElementById('lockBkavNo').value.trim();
+    const bkavDate  = document.getElementById('lockBkavDate').value;
+    if (!bkavNo)   { alert('Vui lòng nhập số hoá đơn BKAV!'); return; }
+    if (!bkavDate) { alert('Vui lòng nhập ngày hoá đơn BKAV!'); return; }
+
+    const btn = document.getElementById('btnConfirmLock');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Đang khoá...';
+
+    fetch('/erp/api/invoice/lock_invoice.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            invoice_id: parseInt(invoiceId),
+            bkav_no:    bkavNo,
+            bkav_date:  bkavDate,
+            csrf_token: CSRF_TOKEN
+        })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('modalLock')).hide();
+            location.reload();
+        } else {
+            alert('Lỗi: ' + res.msg);
+        }
+    })
+    .catch(() => alert('Lỗi kết nối!'))
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-lock me-1"></i>Xác nhận khoá';
+    });
+});
 </script>
 
 <!-- ============ MODAL VAT BKAV ============ -->
@@ -872,6 +945,46 @@ function fmtDate(d) {
                 <button type="button" class="btn btn-warning" id="btnConfirmVAT"
                         onclick="pushToBKAV(this.dataset.invId)">
                     <i class="fas fa-paper-plane me-1"></i>Xác nhận xuất BKAV
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============ MODAL KHOÁ HOÁ ĐƠN ============ -->
+<div class="modal fade" id="modalLock" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-lock me-2"></i>Khoá hoá đơn
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning py-2 small mb-3">
+                    <i class="fas fa-exclamation-triangle me-1"></i>
+                    Sau khi khoá, hoá đơn <strong>chỉ giám đốc mới được sửa</strong>.
+                    Thông tin này sẽ được dùng để chuyển sang công nợ.
+                </div>
+                <input type="hidden" id="lockInvoiceId">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Số hoá đơn nội bộ</label>
+                    <input type="text" id="lockInvoiceNo" class="form-control bg-light" readonly>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Số hoá đơn BKAV <span class="text-danger">*</span></label>
+                    <input type="text" id="lockBkavNo" class="form-control" placeholder="Nhập số HĐ do BKAV cấp">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Ngày hoá đơn BKAV <span class="text-danger">*</span></label>
+                    <input type="date" id="lockBkavDate" class="form-control" value="<?= date('Y-m-d') ?>">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Huỷ</button>
+                <button type="button" class="btn btn-danger" id="btnConfirmLock">
+                    <i class="fas fa-lock me-1"></i>Xác nhận khoá
                 </button>
             </div>
         </div>

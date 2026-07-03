@@ -155,6 +155,17 @@ class BkavEHoaDonClient
         $invoiceNo    = $this->cleanStr((string)($inv['invoice_no'] ?? ''), 50);
         $issuedAt     = date('Y-m-d\TH:i:s', strtotime($invoiceDate));
 
+        $rawEmail      = trim((string)($inv['customer_email'] ?? ''));
+        $emailList     = [];
+        if ($rawEmail !== '') {
+            $emailList = array_filter(
+                array_map('trim', explode(';', $rawEmail)),
+                fn($e) => filter_var($e, FILTER_VALIDATE_EMAIL)
+            );
+        }
+        $receiverEmail = implode(';', $emailList);
+        $receiveTypeId = !empty($receiverEmail) ? 3 : 1;
+
         return [
             'Invoice' => [
                 'InvoiceTypeID'         => (int)(defined('BKAV_INVOICE_TYPE') ? BKAV_INVOICE_TYPE : 1),
@@ -170,8 +181,8 @@ class BkavEHoaDonClient
                 'BuyerAddress'          => $this->cleanStr((string)($inv['address']       ?? ''), 200),
                 'BuyerBankAccount'      => '',
                 'PayMethodID'           => $payMethodId,
-                'ReceiveTypeID'         => 1,
-                'ReceiverEmail'         => '',
+                'ReceiveTypeID'         => $receiveTypeId,
+                'ReceiverEmail'         => $receiverEmail,
                 'ReceiverMobile'        => '',
                 'ReceiverName'          => $this->cleanStr((string)($inv['customer_name'] ?? ''), 120),
                 'ReceiverAddress'       => $this->cleanStr((string)($inv['address']       ?? ''), 200),
