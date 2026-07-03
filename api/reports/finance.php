@@ -166,6 +166,41 @@ $topDebtors = $pdo->query("
     LIMIT 10
 ")->fetchAll();
 
+// ── Trị giá hàng tồn kho (tổng qty còn lại, dùng làm KPI) ──────────────
+// Lưu ý: wa_items không có cột unit_price, nên chỉ tính số lượng tồn
+// Trị giá = tổng qty tồn kho của tất cả mặt hàng
+$inventoryStats = $pdo->query("
+    SELECT
+        COUNT(DISTINCT wi.id) AS so_mat_hang,
+        COALESCE(SUM(
+            CASE WHEN wt_sub.remaining > 0 THEN wt_sub.remaining ELSE 0 END
+        ), 0) AS tong_ton_kho
+    FROM wa_items wi
+    LEFT JOIN (
+        SELECT item_id,
+               SUM(CASE WHEN type='import' THEN qty ELSE -qty END) AS remaining
+        FROM wa_transactions
+        GROUP BY item_id
+    ) wt_sub ON wt_sub.item_id = wi.id
+    WHERE wi.is_active = 1
+")->fetch();
+
+$inventoryItems    = (int)  ($inventoryStats['so_mat_hang']  ?? 0);
+$inventoryTotalQty = (float)($inventoryStats['tong_ton_kho'] ?? 0);
+
+// Top mặt hàng tồn nhiều nhất (để hiển thị trong finance)
+$topInventory = $pdo->query("
+    SELECT wi.item_name, wi.unit,
+           COALESCE(SUM(CASE WHEN wt.type='import' THEN wt.qty ELSE -wt.qty END), 0) AS remaining
+    FROM wa_items wi
+    LEFT JOIN wa_transactions wt ON wt.item_id = wi.id
+    WHERE wi.is_active = 1
+    GROUP BY wi.id
+    HAVING remaining > 0
+    ORDER BY remaining DESC
+    LIMIT 10
+")->fetchAll();
+
 echo json_encode([
     'ok'  => true,
     'kpi' => [
@@ -193,6 +228,8 @@ echo json_encode([
         'payroll_ot'           => $payrollOT,
         'payroll_ot_fmt'       => fmtAmount($payrollOT),
         'payroll_headcount'    => $payrollHeadcount,
+        'inventory_items'      => $inventoryItems,
+        'inventory_total_qty'  => $inventoryTotalQty,
     ],
     'chart_revenue'      => $chartRevenue,
     'chart_payroll'      => $chartPayroll,
@@ -200,4 +237,7 @@ echo json_encode([
     'chart_expense'      => $chartExpense,
     'chart_debt'         => $chartDebt,
     'top_debtors'        => $topDebtors,
+    'inventory_items'    => $inventoryItems,
+    'inventory_total_qty'=> $inventoryTotalQty,
+    'top_inventory'      => $topInventory,
 ], JSON_UNESCAPED_UNICODE);
