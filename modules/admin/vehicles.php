@@ -19,7 +19,7 @@ $docTypeMap = [
     'maintenance' => 'Bảo dưỡng',
 ];
 $filterStatus = trim($_GET['status'] ?? '');
-$selectedTab = in_array($_GET['tab'] ?? '', ['info', 'documents', 'fuel', 'trips'], true) ? (string)$_GET['tab'] : 'info';
+$selectedTab = in_array($_GET['tab'] ?? '', ['info', 'documents', 'fuel', 'maintenance', 'trips'], true) ? (string)$_GET['tab'] : 'info';
 $selectedVehicleId = (int)($_GET['id'] ?? 0);
 
 $vehiclesPageUrl = static function (array $overrides = []) use ($filterStatus, $selectedTab, $selectedVehicleId): string {
@@ -120,12 +120,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $relatedCount = (int)fetchScalarSafe(
                 $pdo,
-                'SELECT (SELECT COUNT(*) FROM vehicle_documents WHERE vehicle_id = ?) + (SELECT COUNT(*) FROM vehicle_fuel WHERE vehicle_id = ?) + (SELECT COUNT(*) FROM vehicle_trips WHERE vehicle_id = ?) AS total',
-                [$id, $id, $id],
+                'SELECT (SELECT COUNT(*) FROM vehicle_documents WHERE vehicle_id = ?) + (SELECT COUNT(*) FROM vehicle_fuel WHERE vehicle_id = ?) + (SELECT COUNT(*) FROM vehicle_maintenance WHERE vehicle_id = ?) + (SELECT COUNT(*) FROM vehicle_trips WHERE vehicle_id = ?) AS total',
+                [$id, $id, $id, $id],
                 0
             );
             if ($relatedCount > 0) {
-                setFlash('danger', 'Không thể xoá xe này vì đã có lịch sử sử dụng hoặc đổ dầu. Vui lòng xoá các dữ liệu liên quan trước.');
+                setFlash('danger', 'Không thể xoá xe này vì đã có dữ liệu liên quan. Vui lòng xoá các dữ liệu bảo dưỡng, hồ sơ, đổ dầu hoặc chuyến đi trước.');
             } else {
                 $pdo->prepare('DELETE FROM vehicles WHERE id = ?')->execute([$id]);
                 setFlash('success', 'Đã xoá phương tiện.');
@@ -192,6 +192,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect($vehiclesPageUrl(['id' => $vehicleId, 'tab' => 'fuel']));
     }
 
+    if ($action === 'add_maintenance') {
+        $vehicleId = (int)($_POST['vehicle_id'] ?? 0);
+        $maintenanceDate = trim($_POST['maintenance_date'] ?? '');
+        $maintenanceType = trim($_POST['maintenance_type'] ?? 'routine');
+        $description = trim($_POST['description'] ?? '');
+        $garageName = trim($_POST['garage_name'] ?? '') ?: null;
+        $invoiceNo = trim($_POST['invoice_no'] ?? '') ?: null;
+        $amount = (float)($_POST['amount'] ?? 0);
+        $odometer = trim($_POST['odometer'] ?? '') !== '' ? (int)$_POST['odometer'] : null;
+        $note = trim($_POST['note'] ?? '') ?: null;
+
+        if (!fetchOneSafe($pdo, 'SELECT id FROM vehicles WHERE id = ? LIMIT 1', [$vehicleId])) {
+            setFlash('danger', 'Không tìm thấy xe cần thêm bảo dưỡng.');
+        } elseif (!$vehicleId || !$isValidDate($maintenanceDate) || $description === '' || $amount <= 0) {
+            setFlash('danger', 'Vui lòng điền đầy đủ thông tin bảo dưỡng.');
+        } elseif (!in_array($maintenanceType, ['routine', 'repair'], true)) {
+            setFlash('danger', 'Loại bảo dưỡng không hợp lệ.');
+        } else {
+            $pdo->prepare("INSERT INTO vehicle_maintenance
+                (vehicle_id, maintenance_date, maintenance_type, description, garage_name, amount, invoice_no, odometer, note, created_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                ->execute([$vehicleId, $maintenanceDate, $maintenanceType, $description, $garageName, $amount, $invoiceNo, $odometer, $note, currentUserId()]);
+            setFlash('success', 'Đã thêm bảo dưỡng/sửa chữa.');
+        }
+        redirect($vehiclesPageUrl(['id' => $vehicleId, 'tab' => 'maintenance']));
+    }
+
+    if ($action === 'delete_maintenance') {
+        $id = (int)($_POST['id'] ?? 0);
+        $vehicleId = (int)($_POST['vehicle_id'] ?? 0);
+        $pdo->prepare('DELETE FROM vehicle_maintenance WHERE id = ?')->execute([$id]);
+        setFlash('success', 'Đã xoá.');
+        redirect($vehiclesPageUrl(['id' => $vehicleId, 'tab' => 'maintenance']));
+    }
+
     if ($action === 'add_trip') {
         $vehicleId = (int)($_POST['vehicle_id'] ?? 0);
         $tripDate = trim($_POST['trip_date'] ?? '');
@@ -244,6 +279,8 @@ if ($vehicles) {
         "SELECT vehicle_id FROM (
             SELECT vehicle_id FROM vehicle_fuel WHERE vehicle_id IN ($ids)
             UNION
+            SELECT vehicle_id FROM vehicle_maintenance WHERE vehicle_id IN ($ids)
+            UNION
             SELECT vehicle_id FROM vehicle_trips WHERE vehicle_id IN ($ids)
         ) t GROUP BY vehicle_id"
     );
@@ -255,8 +292,25 @@ if ($selectedVehicleId <= 0 && !empty($vehicles[0]['id'])) {
 $selectedVehicle = $selectedVehicleId > 0 ? fetchOneSafe($pdo, 'SELECT * FROM vehicles WHERE id = ? LIMIT 1', [$selectedVehicleId]) : null;
 $documents = $selectedVehicle ? fetchAllSafe($pdo, 'SELECT * FROM vehicle_documents WHERE vehicle_id = ? ORDER BY end_date ASC, id DESC', [$selectedVehicleId]) : [];
 $fuels = $selectedVehicle ? fetchAllSafe($pdo, 'SELECT * FROM vehicle_fuel WHERE vehicle_id = ? ORDER BY fuel_date DESC, id DESC', [$selectedVehicleId]) : [];
+$maintenanceList = $selectedVehicle ? fetchAllSafe($pdo,
+    'SELECT vm.*, u.full_name AS created_by_name
+     FROM vehicle_maintenance vm
+     JOIN users u ON u.id = vm.created_by
+     WHERE vm.vehicle_id = ?
+     ORDER BY vm.maintenance_date DESC, vm.id DESC',
+    [$selectedVehicleId]
+) : [];
 $trips = $selectedVehicle ? fetchAllSafe($pdo, 'SELECT vt.*, u.full_name AS driver_name FROM vehicle_trips vt LEFT JOIN users u ON u.id = vt.driver_id WHERE vt.vehicle_id = ? ORDER BY vt.trip_date DESC, vt.id DESC', [$selectedVehicleId]) : [];
 $drivers = fetchAllSafe($pdo, 'SELECT id, full_name, username FROM users WHERE is_active = 1 ORDER BY full_name');
+$thisMonth = date('Y-m');
+$stmtVehicleCostMonth = $pdo->prepare("
+    SELECT
+        COALESCE((SELECT SUM(amount) FROM vehicle_fuel WHERE DATE_FORMAT(fuel_date, '%Y-%m') = ?), 0)
+      + COALESCE((SELECT SUM(amount) FROM vehicle_maintenance WHERE DATE_FORMAT(maintenance_date, '%Y-%m') = ?), 0)
+      + COALESCE((SELECT SUM(toll_fee) FROM vehicle_trips WHERE DATE_FORMAT(trip_date, '%Y-%m') = ? AND toll_fee IS NOT NULL), 0)
+");
+$stmtVehicleCostMonth->execute([$thisMonth, $thisMonth, $thisMonth]);
+$vehicleCostMonth = (float)$stmtVehicleCostMonth->fetchColumn();
 
 $editVehicle = null;
 if (($_GET['action'] ?? '') === 'edit' && (int)($_GET['id'] ?? 0) > 0) {
@@ -290,7 +344,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
             <div>
                 <h4 class="mb-1"><i class="fas fa-car me-2 text-primary"></i>Quản lý phương tiện</h4>
-                <p class="text-muted mb-0">Danh sách xe, hồ sơ, đổ dầu và lịch sử sử dụng theo luồng form POST truyền thống.</p>
+                <p class="text-muted mb-0">Danh sách xe, hồ sơ, đổ dầu, bảo dưỡng và lịch sử sử dụng theo luồng form POST truyền thống.</p>
             </div>
             <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#vehicle-form-card" aria-expanded="<?= $showForm ? 'true' : 'false' ?>"><i class="fas fa-plus me-1"></i> Thêm xe</button>
         </div>
@@ -336,6 +390,18 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
             </div>
         </div>
 
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-muted small mb-1">Tổng chi phí phương tiện tháng <?= e(date('m/Y')) ?></div>
+                        <h4 class="mb-0 text-warning"><?= e(formatCurrency($vehicleCostMonth)) ?></h4>
+                        <div class="small text-muted mt-2">Gồm đổ dầu, bảo dưỡng/sửa chữa và phí cầu đường.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="card border-0 shadow-sm mb-4">
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
@@ -357,7 +423,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                                     <div class="d-flex flex-wrap gap-1">
                                         <a href="/erp/<?= e($vehiclesPageUrl(['id' => (int)$vehicle['id'], 'action' => 'edit', 'show_form' => 1])) ?>#vehicle-form-card" class="btn btn-sm btn-outline-warning" onclick="event.stopPropagation()">Sửa</a>
                                         <?php if ($hasRelated): ?>
-                                            <button type="button" class="btn btn-sm btn-outline-danger" disabled title="Không thể xoá: xe đã có lịch sử sử dụng hoặc đổ dầu" data-bs-toggle="tooltip" onclick="event.stopPropagation()">Xóa</button>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" disabled title="Không thể xoá: xe đã có dữ liệu hồ sơ, đổ dầu, bảo dưỡng hoặc chuyến đi" data-bs-toggle="tooltip" onclick="event.stopPropagation()">Xóa</button>
                                         <?php else: ?>
                                             <form method="post" class="d-inline" onclick="event.stopPropagation()">
                                                 <?= csrfInput() ?>
@@ -391,6 +457,12 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                         <li class="nav-item"><a class="nav-link <?= $selectedTab === 'info' ? 'active' : '' ?>" href="/erp/<?= e($vehiclesPageUrl(['id' => $selectedVehicleId, 'tab' => 'info'])) ?>">Info</a></li>
                         <li class="nav-item"><a class="nav-link <?= $selectedTab === 'documents' ? 'active' : '' ?>" href="/erp/<?= e($vehiclesPageUrl(['id' => $selectedVehicleId, 'tab' => 'documents'])) ?>">Hồ sơ</a></li>
                         <li class="nav-item"><a class="nav-link <?= $selectedTab === 'fuel' ? 'active' : '' ?>" href="/erp/<?= e($vehiclesPageUrl(['id' => $selectedVehicleId, 'tab' => 'fuel'])) ?>">Đổ dầu</a></li>
+                        <li class="nav-item">
+                            <a class="nav-link <?= $selectedTab === 'maintenance' ? 'active' : '' ?>" href="/erp/<?= e($vehiclesPageUrl(['id' => $selectedVehicleId, 'tab' => 'maintenance'])) ?>">
+                                <i class="fas fa-wrench me-1"></i>Bảo dưỡng &amp; Sửa chữa
+                                <span class="badge bg-warning ms-1"><?= count($maintenanceList) ?></span>
+                            </a>
+                        </li>
                         <li class="nav-item"><a class="nav-link <?= $selectedTab === 'trips' ? 'active' : '' ?>" href="/erp/<?= e($vehiclesPageUrl(['id' => $selectedVehicleId, 'tab' => 'trips'])) ?>">Lịch sử sử dụng</a></li>
                     </ul>
 
@@ -469,6 +541,63 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                                         <td><form method="post" class="d-inline"><?= csrfInput() ?><input type="hidden" name="action" value="delete_fuel"><input type="hidden" name="vehicle_id" value="<?= $selectedVehicleId ?>"><input type="hidden" name="id" value="<?= (int)$fuel['id'] ?>"><button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Xoá lần đổ dầu này?');">Xóa</button></form></td>
                                     </tr>
                                 <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php elseif ($selectedTab === 'maintenance'): ?>
+                        <form method="post" class="border rounded p-3 mb-3 bg-light">
+                            <?= csrfInput() ?>
+                            <input type="hidden" name="action" value="add_maintenance">
+                            <input type="hidden" name="vehicle_id" value="<?= $selectedVehicleId ?>">
+                            <div class="row g-3">
+                                <div class="col-md-3"><label class="form-label fw-semibold">Ngày <span class="text-danger">*</span></label><input type="date" name="maintenance_date" class="form-control" value="<?= e(date('Y-m-d')) ?>" required></div>
+                                <div class="col-md-3"><label class="form-label fw-semibold">Loại <span class="text-danger">*</span></label><select name="maintenance_type" class="form-select" required><option value="routine">🔧 Bảo dưỡng định kỳ</option><option value="repair">🛠️ Sửa chữa</option></select></div>
+                                <div class="col-md-6"><label class="form-label fw-semibold">Mô tả công việc <span class="text-danger">*</span></label><input type="text" name="description" class="form-control" placeholder="VD: Thay dầu máy, thay lốp..." required></div>
+                                <div class="col-md-3"><label class="form-label fw-semibold">Chi phí (đ) <span class="text-danger">*</span></label><input type="number" name="amount" class="form-control" min="0" step="1000" required></div>
+                                <div class="col-md-3"><label class="form-label fw-semibold">Garage/Xưởng</label><input type="text" name="garage_name" class="form-control" placeholder="Tên garage..."></div>
+                                <div class="col-md-3"><label class="form-label fw-semibold">Số hóa đơn</label><input type="text" name="invoice_no" class="form-control"></div>
+                                <div class="col-md-3"><label class="form-label fw-semibold">Km hiện tại</label><input type="number" name="odometer" class="form-control" min="0"></div>
+                                <div class="col-md-12"><label class="form-label fw-semibold">Ghi chú</label><textarea name="note" class="form-control" rows="2"></textarea></div>
+                            </div>
+                            <div class="mt-3"><button type="submit" class="btn btn-warning btn-sm"><i class="fas fa-plus me-1"></i>Thêm bảo dưỡng/sửa chữa</button></div>
+                        </form>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover align-middle mb-0">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Ngày</th>
+                                        <th>Loại</th>
+                                        <th>Mô tả</th>
+                                        <th>Garage</th>
+                                        <th>Km</th>
+                                        <th class="text-end">Chi phí</th>
+                                        <th>Hóa đơn</th>
+                                        <th>Người nhập</th>
+                                        <th>Thao tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                <?php if (!$maintenanceList): ?><tr><td colspan="9" class="text-center text-muted py-3">Chưa có lịch sử bảo dưỡng/sửa chữa.</td></tr><?php endif; ?>
+                                <?php foreach ($maintenanceList as $maintenance): ?>
+                                    <tr>
+                                        <td><?= e(formatDate($maintenance['maintenance_date'])) ?></td>
+                                        <td><?= $maintenance['maintenance_type'] === 'repair' ? '🛠️ Sửa chữa' : '🔧 Bảo dưỡng định kỳ' ?></td>
+                                        <td><?= e($maintenance['description']) ?></td>
+                                        <td><?= e($maintenance['garage_name'] ?: '—') ?></td>
+                                        <td><?= e($maintenance['odometer'] !== null ? number_format((int)$maintenance['odometer'], 0, ',', '.') : '—') ?></td>
+                                        <td class="text-end"><?= e(formatCurrency($maintenance['amount'])) ?></td>
+                                        <td><?= e($maintenance['invoice_no'] ?: '—') ?></td>
+                                        <td><?= e($maintenance['created_by_name']) ?></td>
+                                        <td><form method="post" class="d-inline"><?= csrfInput() ?><input type="hidden" name="action" value="delete_maintenance"><input type="hidden" name="vehicle_id" value="<?= $selectedVehicleId ?>"><input type="hidden" name="id" value="<?= (int)$maintenance['id'] ?>"><button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Xoá lịch sử bảo dưỡng này?');">Xóa</button></form></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                <?php if ($maintenanceList): ?>
+                                    <tr class="table-warning fw-bold">
+                                        <td colspan="5">Tổng chi phí bảo dưỡng/sửa chữa</td>
+                                        <td class="text-end"><?= e(formatCurrency(array_sum(array_map('floatval', array_column($maintenanceList, 'amount'))))) ?></td>
+                                        <td colspan="3"></td>
+                                    </tr>
+                                <?php endif; ?>
                                 </tbody>
                             </table>
                         </div>

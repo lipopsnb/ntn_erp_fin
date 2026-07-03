@@ -226,6 +226,33 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
     </div>
   </div>
 
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+      <h6 class="card-title mb-3">
+        <i class="fas fa-receipt me-2 text-warning"></i>Chi tiết chi phí hành chính
+      </h6>
+      <div class="row g-3">
+        <div class="col-md-3">
+          <div class="text-muted small">Chi phí văn phòng &amp; hành chính</div>
+          <div class="fw-bold" id="kpiAdminBaseVal">—</div>
+        </div>
+        <div class="col-md-3">
+          <div class="text-muted small">Khấu hao tài sản</div>
+          <div class="fw-bold" id="kpiDeprVal">—</div>
+        </div>
+        <div class="col-md-3">
+          <div class="text-muted small">Chi phí phương tiện</div>
+          <div class="fw-bold" id="kpiVehicleVal">—</div>
+          <div class="text-muted" style="font-size:11px" id="kpiVehicleDetail">—</div>
+        </div>
+        <div class="col-md-3">
+          <div class="text-muted small fw-semibold">Tổng chi phí hành chính</div>
+          <div class="fw-bold text-warning fs-6" id="kpiAdminTotalVal">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Biểu đồ hàng 1 -->
   <div class="row g-3 mb-4">
     <!-- So sánh 12 tháng -->
@@ -364,6 +391,15 @@ function loadAll() {
       document.getElementById('kpiSiCompanyVal').textContent    = fmt(k.payroll_si_company);
       document.getElementById('kpiPayrollNetVal').textContent   = fmt(k.payroll_net);
       document.getElementById('kpiHeadcountVal').textContent    = (k.payroll_headcount ?? 0) + ' NV';
+
+      if (document.getElementById('kpiAdminBaseVal')) {
+        document.getElementById('kpiAdminBaseVal').textContent = fmt(k.expense_admin_base);
+        document.getElementById('kpiDeprVal').textContent = fmt(k.expense_depr);
+        document.getElementById('kpiVehicleVal').textContent = fmt(k.expense_vehicle);
+        document.getElementById('kpiVehicleDetail').textContent =
+          'Dầu: ' + fmt(k.expense_fuel) + ' | Bảo dưỡng: ' + fmt(k.expense_maintenance) + ' | Cầu đường: ' + fmt(k.expense_toll);
+        document.getElementById('kpiAdminTotalVal').textContent = fmt(k.expense_admin);
+      }
 
       // KPI tồn kho
       if (document.getElementById('kpiInventoryQtyVal')) {

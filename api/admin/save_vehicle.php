@@ -21,7 +21,7 @@ $type = trim($_POST['type'] ?? 'vehicle');
 $action = trim($_POST['action'] ?? '');
 $id = (int)($_POST['id'] ?? 0);
 
-if (!in_array($type, ['vehicle', 'fuel', 'document', 'trip'], true)) {
+if (!in_array($type, ['vehicle', 'fuel', 'document', 'maintenance', 'trip'], true)) {
     echo json_encode(['ok' => false, 'msg' => 'Type không hợp lệ']);
     exit;
 }
@@ -36,11 +36,11 @@ try {
             if (!$id) {
                 throw new RuntimeException('Thiếu ID');
             }
-            $hasData = $pdo->prepare('SELECT (SELECT COUNT(*) FROM vehicle_fuel WHERE vehicle_id=?) + (SELECT COUNT(*) FROM vehicle_trips WHERE vehicle_id=?) AS total');
-            $hasData->execute([$id, $id]);
+            $hasData = $pdo->prepare('SELECT (SELECT COUNT(*) FROM vehicle_fuel WHERE vehicle_id=?) + (SELECT COUNT(*) FROM vehicle_maintenance WHERE vehicle_id=?) + (SELECT COUNT(*) FROM vehicle_trips WHERE vehicle_id=?) AS total');
+            $hasData->execute([$id, $id, $id]);
             $count = (int)$hasData->fetchColumn();
             if ($count > 0) {
-                echo json_encode(['ok' => false, 'msg' => "Xe có $count bản ghi liên quan (nhiên liệu/chuyến đi). Không thể xoá."]);
+                echo json_encode(['ok' => false, 'msg' => "Xe có $count bản ghi liên quan (nhiên liệu/bảo dưỡng/chuyến đi). Không thể xoá."]);
                 exit;
             }
             $pdo->prepare('DELETE FROM vehicles WHERE id = ?')->execute([$id]);
@@ -91,6 +91,7 @@ try {
         $tableMap = [
             'fuel' => 'vehicle_fuel',
             'document' => 'vehicle_documents',
+            'maintenance' => 'vehicle_maintenance',
             'trip' => 'vehicle_trips',
         ];
         $pdo->prepare('DELETE FROM ' . $tableMap[$type] . ' WHERE id = ?')->execute([$id]);
@@ -157,6 +158,40 @@ try {
                 (vehicle_id, doc_type, start_date, end_date, cost, provider, note, created_by)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
                 ->execute([$vehicleId, $docType, $startDate, $endDate, $cost, $provider, $note, $user['id']]);
+            $id = (int)$pdo->lastInsertId();
+        }
+    }
+
+    if ($type === 'maintenance') {
+        $maintenanceDate = trim($_POST['maintenance_date'] ?? '');
+        $maintenanceType = trim($_POST['maintenance_type'] ?? 'routine');
+        $description = trim($_POST['description'] ?? '');
+        $garageName = trim($_POST['garage_name'] ?? '') ?: null;
+        $amount = (float)($_POST['amount'] ?? 0);
+        $invoiceNo = trim($_POST['invoice_no'] ?? '') ?: null;
+        $odometer = trim($_POST['odometer'] ?? '') !== '' ? (int)$_POST['odometer'] : null;
+        $note = trim($_POST['note'] ?? '') ?: null;
+
+        if ($maintenanceDate === '' || $description === '' || $amount <= 0) {
+            throw new RuntimeException('Vui lòng nhập đầy đủ thông tin bảo dưỡng/sửa chữa.');
+        }
+        if (!in_array($maintenanceType, ['routine', 'repair'], true)) {
+            throw new RuntimeException('Loại bảo dưỡng không hợp lệ');
+        }
+        if ($action === 'edit' && !$id) {
+            throw new RuntimeException('Thiếu ID lịch sử bảo dưỡng');
+        }
+
+        if ($action === 'edit') {
+            $pdo->prepare("UPDATE vehicle_maintenance
+                SET maintenance_date = ?, maintenance_type = ?, description = ?, garage_name = ?, amount = ?, invoice_no = ?, odometer = ?, note = ?
+                WHERE id = ?")
+                ->execute([$maintenanceDate, $maintenanceType, $description, $garageName, $amount, $invoiceNo, $odometer, $note, $id]);
+        } else {
+            $pdo->prepare("INSERT INTO vehicle_maintenance
+                (vehicle_id, maintenance_date, maintenance_type, description, garage_name, amount, invoice_no, odometer, note, created_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                ->execute([$vehicleId, $maintenanceDate, $maintenanceType, $description, $garageName, $amount, $invoiceNo, $odometer, $note, $user['id']]);
             $id = (int)$pdo->lastInsertId();
         }
     }
