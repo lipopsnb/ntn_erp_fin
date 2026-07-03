@@ -84,7 +84,7 @@ try {
     // Bỏ qua nếu bảng chưa có hoặc thiếu cột
 }
 
-$now = new DateTimeImmutable('now', new DateTimeZone(date_default_timezone_get()));
+$now = new DateTimeImmutable('now', new DateTimeZone('Asia/Ho_Chi_Minh'));
 $documentDate = $now->format('Ymd');
 $displayDate = $now->format('d/m/Y');
 $customerCode = trim((string)($customer['customer_code'] ?? '')) ?: (string)$customer['id'];
@@ -123,7 +123,7 @@ $sheet->setCellValue('A7', 'QUOTATION');
 $sheet->mergeCells('A8:I8');
 $sheet->setCellValue('A8', 'To: ' . ($customer['customer_name'] ?? ''));
 $sheet->mergeCells('A9:I9');
-$sheet->setCellValue('A9', 'First of all, we would like to express our sincere thank for your interest in our products,');
+$sheet->setCellValue('A9', 'First of all, we would like to express our sincere thanks for your interest in our products,');
 $sheet->mergeCells('A10:I10');
 $sheet->setCellValue('A10', 'and believe these products will fully meet your expectations.');
 $sheet->mergeCells('A11:I11');
