@@ -101,7 +101,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
             <table class="table table-sm table-hover align-middle mb-0">
               <thead class="table-light">
                 <tr>
-                  <th>Mã đơn</th><th>Khách hàng</th><th>Ngày giao</th>
+                  <th>Mã đơn</th><th>Khách hàng</th><th>Ngày tạo</th>
                   <th>Kế hoạch</th><th>Thực tế</th><th>Lỗi</th>
                   <th style="min-width:120px;">Tiến độ</th><th>TT</th>
                 </tr>
@@ -206,7 +206,7 @@ function loadAll() {
           <tr>
             <td><strong>${esc(o.order_no)}</strong></td>
             <td>${esc(o.customer_name)}</td>
-            <td>${o.expected_delivery_date ? esc(o.expected_delivery_date) : '<span class="text-muted">—</span>'}</td>
+            <td>${o.created_at ? esc(o.created_at.substring(0,10)) : '<span class="text-muted">—</span>'}</td>
             <td>${parseFloat(o.qty_total).toLocaleString()}</td>
             <td>${parseFloat(o.qty_done).toLocaleString()}</td>
             <td>${parseFloat(o.qty_error).toLocaleString()}</td>
@@ -225,7 +225,7 @@ function loadAll() {
           const pct = o.qty_total > 0 ? (o.qty_done / o.qty_total * 100).toFixed(1) : 0;
           return `<div class="alert alert-warning py-2 mb-2">
             <strong>${esc(o.order_no)}</strong> — ${esc(o.customer_name)}<br>
-            <small>Ngày giao: <strong>${esc(o.expected_delivery_date)}</strong> | Tiến độ: ${pct}%</small>
+            <small>Ngày tạo: <strong>${o.created_at ? esc(o.created_at.substring(0,10)) : '—'}</strong> | Tiến độ: ${pct}%</small>
           </div>`;
         }).join('');
       }

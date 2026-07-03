@@ -294,7 +294,7 @@ function loadAll() {
           <tr>
             <td><strong>${esc(o.order_no)}</strong></td>
             <td>${esc(o.customer_name)}</td>
-            <td>${o.expected_delivery_date ? esc(o.expected_delivery_date) : '<span class="text-muted">Chưa đặt</span>'}</td>
+            <td><span class="text-muted">—</span></td>
             <td>${progressBar(o.progress_pct)}</td>
             <td>${statusBadge(o.status)}</td>
           </tr>

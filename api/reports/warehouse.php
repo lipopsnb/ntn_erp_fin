@@ -37,9 +37,16 @@ $lowStockCount = (int)$pdo->query("
 ")->fetchColumn();
 
 // ── KPI: Thành phẩm chờ giao ─────────────────────────────────────────────
-$waitingDelivery = (int)$pdo->query(
-    "SELECT COUNT(*) FROM warehouse_items WHERE status = 'waiting'"
-)->fetchColumn();
+// Dùng production_items có qty_done > 0 và chưa xuất qua oqc_delivery_items
+$waitingDelivery = (int)$pdo->query("
+    SELECT COUNT(DISTINCT pi.id)
+    FROM production_items pi
+    WHERE pi.qty_done > 0
+      AND pi.id NOT IN (
+          SELECT DISTINCT production_item_id FROM oqc_delivery_items
+          WHERE production_item_id IS NOT NULL
+      )
+")->fetchColumn();
 
 // ── KPI: Hàng tồn lâu (import > 30 ngày không có export) ────────────────
 $slowMoving = (int)$pdo->query("
@@ -92,13 +99,21 @@ $lowStockList = $pdo->query("
     LIMIT 20
 ")->fetchAll();
 
-// ── Thành phẩm tồn lâu (> 30 ngày) ──────────────────────────────────────
+// ── Thành phẩm tồn lâu (> 30 ngày chưa xuất) ───────────────────────────
 $oldFinished = $pdo->query("
-    SELECT lot_no, product_code, qty, created_at
-    FROM warehouse_items
-    WHERE status = 'waiting'
-      AND created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)
-    ORDER BY created_at ASC
+    SELECT po.order_no AS lot_no, c.customer_name,
+           pi.qty_done, pi.qty_total, pi.updated_at AS last_updated
+    FROM production_items pi
+    JOIN production_orders po ON po.id = pi.order_id
+    JOIN iqc_receipts r ON r.id = po.iqc_receipt_id
+    JOIN customers c ON c.id = r.customer_id
+    WHERE pi.qty_done > 0
+      AND pi.updated_at < DATE_SUB(NOW(), INTERVAL 30 DAY)
+      AND pi.id NOT IN (
+          SELECT DISTINCT production_item_id FROM oqc_delivery_items
+          WHERE production_item_id IS NOT NULL
+      )
+    ORDER BY pi.updated_at ASC
     LIMIT 20
 ")->fetchAll();
 

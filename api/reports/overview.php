@@ -93,22 +93,10 @@ $stockItems = (int)$pdo->query("
     ) t
 ")->fetchColumn();
 
-// ── KPI: Đơn sắp giao (trong 3 ngày) ─────────────────────────────────────
-$ordersUpcoming = (int)$pdo->query("
-    SELECT COUNT(*)
-    FROM production_orders
-    WHERE expected_delivery_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 3 DAY)
-      AND status != 'done'
-")->fetchColumn();
-
-// ── KPI: Đơn bị trễ ──────────────────────────────────────────────────────
-$ordersLate = (int)$pdo->query("
-    SELECT COUNT(*)
-    FROM production_orders
-    WHERE expected_delivery_date < CURDATE()
-      AND status != 'done'
-      AND expected_delivery_date IS NOT NULL
-")->fetchColumn();
+// ── KPI: Đơn sắp giao / trễ ──────────────────────────────────────────────
+// expected_delivery_date chưa có trong DB — set = 0 tạm thời
+$ordersUpcoming = 0;
+$ordersLate     = 0;
 
 // ── Biểu đồ: Doanh thu 12 tháng ──────────────────────────────────────────
 $chartRevRows = $pdo->query("
@@ -123,19 +111,20 @@ $chartRevRows = $pdo->query("
 ")->fetchAll();
 
 // ── Bảng tiến độ đơn hàng ────────────────────────────────────────────────
+// JOIN qua iqc_receipts để lấy customer_name (po.customer_id không tồn tại)
 $ordersProgressRows = $pdo->query("
     SELECT po.order_no,
-           COALESCE(c.customer_name, '—') AS customer_name,
-           po.expected_delivery_date,
+           c.customer_name,
            po.status,
            COALESCE(SUM(pi.qty_done), 0) AS qty_done,
            COALESCE(SUM(pi.qty_total), 0) AS qty_total
     FROM production_orders po
-    LEFT JOIN customers c ON po.customer_id = c.id
+    JOIN iqc_receipts r ON r.id = po.iqc_receipt_id
+    JOIN customers c ON c.id = r.customer_id
     LEFT JOIN production_items pi ON pi.order_id = po.id
     WHERE po.status IN ('pending','in_progress')
     GROUP BY po.id
-    ORDER BY po.expected_delivery_date ASC, po.id DESC
+    ORDER BY po.id DESC
     LIMIT 20
 ")->fetchAll();
 
@@ -146,7 +135,7 @@ $ordersProgress = array_map(function($r) {
     return [
         'order_no'               => $r['order_no'],
         'customer_name'          => $r['customer_name'],
-        'expected_delivery_date' => $r['expected_delivery_date'],
+        'expected_delivery_date' => null,
         'progress_pct'           => $pct,
         'status'                 => $r['status'],
     ];
@@ -166,19 +155,18 @@ $topCustomers = $pdo->query("
 // ── Cảnh báo ─────────────────────────────────────────────────────────────
 $alerts = [];
 
-// Đơn hàng quá hạn
+// Đơn hàng quá hạn: lấy đơn in_progress tạo > 14 ngày chưa xong
 $lateOrders = $pdo->query("
-    SELECT order_no, expected_delivery_date
-    FROM production_orders
-    WHERE expected_delivery_date < CURDATE()
-      AND status != 'done'
-      AND expected_delivery_date IS NOT NULL
+    SELECT po.order_no, po.created_at
+    FROM production_orders po
+    WHERE po.status = 'in_progress'
+      AND po.created_at <= DATE_SUB(NOW(), INTERVAL 14 DAY)
     LIMIT 10
 ")->fetchAll();
 foreach ($lateOrders as $lo) {
     $alerts[] = [
         'type'    => 'late_order',
-        'message' => 'Đơn hàng ' . $lo['order_no'] . ' quá hạn giao (' . $lo['expected_delivery_date'] . ')',
+        'message' => 'Đơn hàng ' . $lo['order_no'] . ' đang SX quá 14 ngày chưa hoàn thành',
         'level'   => 'danger',
     ];
 }
@@ -219,10 +207,17 @@ foreach ($overdueInv as $oi) {
     ];
 }
 
-// Thành phẩm chờ giao
-$waitingItems = (int)$pdo->query(
-    "SELECT COUNT(*) FROM warehouse_items WHERE status = 'waiting'"
-)->fetchColumn();
+// Thành phẩm chờ giao: production_items done nhưng chưa có trong oqc_delivery_items
+$waitingItems = (int)$pdo->query("
+    SELECT COUNT(DISTINCT pi.id)
+    FROM production_items pi
+    WHERE pi.qty_done > 0
+      AND pi.id NOT IN (
+          SELECT DISTINCT odi.production_item_id
+          FROM oqc_delivery_items odi
+          WHERE odi.production_item_id IS NOT NULL
+      )
+")->fetchColumn();
 if ($waitingItems > 0) {
     $alerts[] = [
         'type'    => 'waiting_delivery',
