@@ -38,6 +38,7 @@ $expenseAdminBase = (float)$stmtExp->fetchColumn();
 $dateFromObj = new DateTime($dateFrom);
 $dateToObj = new DateTime($dateTo);
 $daysDiff = (int)$dateFromObj->diff($dateToObj)->days + 1;
+// 30.4375 = số ngày trung bình mỗi tháng (365.25 / 12), dùng để quy đổi khoảng ngày sang phần tháng.
 $monthFraction = $daysDiff / 30.4375;
 
 $stmtDepr = $pdo->prepare("

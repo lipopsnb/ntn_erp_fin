@@ -59,7 +59,11 @@ $isValidDate = static function (?string $value): bool {
 $calculateDepreciationPerMonth = static function (array $asset): ?float {
     $depreciationYears = isset($asset['depreciation_years']) ? (float)$asset['depreciation_years'] : 0;
     $purchasePrice = isset($asset['purchase_price']) ? (float)$asset['purchase_price'] : 0;
+    $startDate = $asset['depreciation_start_date'] ?? ($asset['purchase_date'] ?? null);
     if ($depreciationYears <= 0 || $purchasePrice <= 0) {
+        return null;
+    }
+    if ($startDate && $startDate > date('Y-m-d')) {
         return null;
     }
 
@@ -382,7 +386,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/erp/includes/sidebar.php';
                             <div class="col-12"><div class="border-top pt-3 mt-1"><h6 class="mb-3 text-warning"><i class="fas fa-chart-line me-2"></i>Khấu hao tài sản</h6></div></div>
                             <div class="col-md-4"><label class="form-label fw-semibold">Thời gian khấu hao (năm)</label><input type="number" name="depreciation_years" class="form-control text-end" min="0" step="0.01" placeholder="VD: 5" value="<?= e($formValues['depreciation_years']) ?>"></div>
                             <div class="col-md-4"><label class="form-label fw-semibold">Giá trị còn lại</label><input type="number" name="salvage_value" class="form-control text-end" min="0" step="0.01" value="<?= e($formValues['salvage_value']) ?>"></div>
-                            <div class="col-md-4"><label class="form-label fw-semibold">Ngày bắt đầu khấu hao</label><input type="date" name="depreciation_start_date" class="form-control" value="<?= e($formValues['depreciation_start_date'] ?: $formValues['purchase_date']) ?>"></div>
+                            <div class="col-md-4"><label class="form-label fw-semibold">Ngày bắt đầu khấu hao</label><input type="date" name="depreciation_start_date" class="form-control" value="<?= e($formValues['depreciation_start_date'] ?: $formValues['purchase_date']) ?>"><div class="form-text">Để trống sẽ mặc định theo ngày mua.</div></div>
                             <div class="col-12"><label class="form-label fw-semibold">Ghi chú</label><textarea name="note" class="form-control" rows="2"><?= e($formValues['note']) ?></textarea></div>
                         </div>
                         <div class="mt-3 d-flex gap-2">

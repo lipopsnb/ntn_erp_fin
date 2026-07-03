@@ -205,8 +205,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (!fetchOneSafe($pdo, 'SELECT id FROM vehicles WHERE id = ? LIMIT 1', [$vehicleId])) {
             setFlash('danger', 'Không tìm thấy xe cần thêm bảo dưỡng.');
-        } elseif (!$vehicleId || !$isValidDate($maintenanceDate) || $description === '' || $amount <= 0) {
-            setFlash('danger', 'Vui lòng điền đầy đủ thông tin bảo dưỡng.');
+        } elseif (!$vehicleId) {
+            setFlash('danger', 'Thiếu phương tiện cần bảo dưỡng.');
+        } elseif (!$isValidDate($maintenanceDate)) {
+            setFlash('danger', 'Ngày bảo dưỡng không hợp lệ.');
+        } elseif ($description === '') {
+            setFlash('danger', 'Vui lòng nhập mô tả công việc.');
+        } elseif ($amount <= 0) {
+            setFlash('danger', 'Chi phí bảo dưỡng phải lớn hơn 0.');
         } elseif (!in_array($maintenanceType, ['routine', 'repair'], true)) {
             setFlash('danger', 'Loại bảo dưỡng không hợp lệ.');
         } else {
