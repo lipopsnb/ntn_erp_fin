@@ -92,7 +92,7 @@ foreach ($rows as $r) {
         $summary['bucket_60_plus'] += $remaining;
     }
 
-    $customerLabel = trim(($r['customer_code'] ?? '') . ' - ' . ($r['customer_name'] ?? ''));
+    $customerLabel = trim($r['customer_code'] ?? '');
     if (!isset($customerDebt[$customerLabel])) {
         $customerDebt[$customerLabel] = 0;
     }
